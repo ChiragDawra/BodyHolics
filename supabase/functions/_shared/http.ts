@@ -1,0 +1,40 @@
+// Server-only. Deliberately NOT mirrored from packages/domain: an HTTP status is
+// a transport concern, and packages/domain is pure logic with no notion of one.
+
+import type { ErrorCode } from './errors.ts';
+
+/** docs/07 §2. The single mapping from an error code to a status. */
+export const ERROR_STATUS: Record<ErrorCode, number> = {
+  VALIDATION_FAILED: 400,
+  UNAUTHENTICATED: 401,
+  FORBIDDEN: 403,
+  NOT_GYM_STAFF: 403,
+  NOT_GYM_MEMBER: 403,
+  CROSS_TENANT_ACCESS: 403,
+  // docs/07 §1: a row in another gym is 404, never 403 — a 403 confirms it exists.
+  NOT_FOUND: 404,
+  GYM_NOT_FOUND: 404,
+  GYM_INACTIVE: 422,
+  PLAN_NOT_FOUND: 404,
+  PLAN_INACTIVE: 422,
+  MEMBERSHIP_ALREADY_PENDING: 409,
+  INVALID_MEMBERSHIP_TRANSITION: 409,
+  PAYMENT_NOT_FOUND: 404,
+  PAYMENT_ALREADY_PROCESSED: 409,
+  PAYMENT_NOT_PENDING: 409,
+  INVALID_PAYMENT_TRANSITION: 409,
+  PAYMENT_PROVIDER_ERROR: 502,
+  WEBHOOK_SIGNATURE_INVALID: 401,
+  QR_TOKEN_INVALID: 400,
+  QR_TOKEN_EXPIRED: 409,
+  QR_TOKEN_ALREADY_USED: 409,
+  BROADCAST_IMMUTABLE: 409,
+  BROADCAST_EMPTY_AUDIENCE: 422,
+  ISSUE_CLOSED: 409,
+  INVALID_ISSUE_TRANSITION: 409,
+  OVERRIDE_RANGE_INVALID: 400,
+  FILE_TOO_LARGE: 400,
+  UNSUPPORTED_FILE_TYPE: 400,
+  RATE_LIMITED: 429,
+  INTERNAL_ERROR: 500,
+};
