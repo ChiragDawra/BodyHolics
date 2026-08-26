@@ -1,0 +1,14 @@
+{
+  "extends": "@gym/config/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "types": ["react", "expo"],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["app", "src", "app.config.ts", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules"]
+}
