@@ -17,11 +17,13 @@
     "test:shared-parity": "node scripts/check-shared-parity.mjs",
     "check:secrets": "bash scripts/check-no-secrets.sh",
     "db:reset": "supabase db reset",
-    "db:test": "supabase test db",
+    "db:test": "supabase db reset && supabase test db",
     "gen:types": "supabase gen types typescript --local > packages/types/src/database.ts",
-    "clean": "git clean -xdf node_modules dist .next .expo .turbo"
+    "clean": "git clean -xdf node_modules dist .next .expo .turbo",
+    "db:test:only": "supabase test db"
   },
   "devDependencies": {
+    "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.6",
     "supabase": "2.115.0",
     "turbo": "2.10.12",

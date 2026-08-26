@@ -52,10 +52,10 @@ export async function invokeFunction<T>(
   };
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
 
-  const { data, error } = await supabase.functions.invoke<ApiSuccess<T> | ApiFailure>(name, {
+  const { data, error } = (await supabase.functions.invoke<ApiSuccess<T> | ApiFailure>(name, {
     body,
     headers,
-  });
+  })) as { data: ApiSuccess<T> | ApiFailure | null; error: unknown };
 
   // A non-2xx arrives here as `error` with the parsed body still on `data`,
   // so the envelope is checked first and the transport error is the fallback.

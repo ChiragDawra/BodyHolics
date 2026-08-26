@@ -60,7 +60,11 @@ export async function publishBroadcastAction(
 ): Promise<BroadcastActionResult> {
   await requireStaffSession();
 
-  const audienceType = String(formData.get('audienceType') ?? '');
+  // formData.get can return a File, whose default stringification is
+  // "[object File]" — a value that would then fail the audience enum for a
+  // reason nobody could read. Only a real string is accepted.
+  const rawAudience = formData.get('audienceType');
+  const audienceType = typeof rawAudience === 'string' ? rawAudience : '';
   const publishAt = formData.get('publishAt');
 
   const parsed = publishBroadcastSchema.safeParse({

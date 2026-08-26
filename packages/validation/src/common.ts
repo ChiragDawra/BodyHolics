@@ -12,7 +12,15 @@ export const gymSlugSchema = z
   .max(64)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens.');
 
-/** C0 and C1 control characters, which no user-entered field ever needs. */
+/**
+ * C0 and C1 control characters, which no user-entered field ever needs.
+ *
+ * no-control-regex exists to catch a control character that ended up in a
+ * pattern by accident. Here they are the entire subject: this is the check that
+ * stops a terminal escape sequence reaching an admin console and a line break
+ * reaching a CSV export.
+ */
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/;
 
 /**

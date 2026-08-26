@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createPlanSchema, updatePlanSchema } from '@gym/validation';
+import { MoneyError, parseRupees } from '@gym/domain';
 import { createClient } from '@/lib/supabase/server';
 import { requireStaffSession } from '@/lib/session';
 import type { PlanRow, PlanActionResult } from './types';
@@ -53,15 +54,33 @@ export async function createPlanAction(
 
   // The form sends rupees because that is what a person types; it becomes paise
   // here and stays an integer from this point on (CLAUDE.md rule 6).
-  const rupees = Number(formData.get('priceRupees'));
-  if (!Number.isFinite(rupees) || rupees < 0) {
-    return { status: 'error', message: 'Enter a price in rupees.' };
+  //
+  // parseRupees rather than `Math.round(value * 100)`: the latter does float
+  // arithmetic on money and then hides the error by rounding, so ₹10.999
+  // silently becomes ₹11.00. This rejects sub-paise precision instead.
+  // formData.get can return a File, whose default stringification is
+  // "[object File]" — parseRupees would reject it, but for a reason nobody
+  // could read. Only a real string gets that far.
+  const rawPrice = formData.get('priceRupees');
+
+  let pricePaise: number;
+  try {
+    pricePaise = parseRupees(typeof rawPrice === 'string' ? rawPrice : '');
+  } catch (error) {
+    if (error instanceof MoneyError) {
+      return { status: 'error', message: 'Enter a price in rupees, e.g. 1499 or 1499.50.' };
+    }
+    throw error;
+  }
+
+  if (pricePaise < 0) {
+    return { status: 'error', message: 'A price cannot be negative.' };
   }
 
   const parsed = createPlanSchema.safeParse({
     name: formData.get('name'),
     ...(formData.get('description') ? { description: formData.get('description') } : {}),
-    pricePaise: Math.round(rupees * 100),
+    pricePaise,
     durationDays: Number(formData.get('durationDays')),
     sortOrder: Number(formData.get('sortOrder') ?? 0),
   });

@@ -7,6 +7,9 @@ const config: NextConfig = {
   transpilePackages: ['@gym/domain', '@gym/types', '@gym/ui', '@gym/validation'],
   typedRoutes: true,
   poweredByHeader: false,
+  // Next's type requires a promise here, so the async is part of the contract
+  // rather than an oversight.
+  // eslint-disable-next-line @typescript-eslint/require-await
   async headers() {
     return [
       {

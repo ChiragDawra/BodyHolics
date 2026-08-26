@@ -19,6 +19,14 @@ export const ignores = [
   '**/coverage/**',
   '**/*.generated.ts',
   '**/database.ts',
+  // Config files sit outside every tsconfig project, so the typed rules cannot
+  // parse them. Standing up a second project just to lint a build config is not
+  // worth it; the files are small, declarative, and checked by whatever consumes
+  // them failing loudly.
+  '**/*.config.js',
+  '**/*.config.mjs',
+  '**/*.config.cjs',
+  'eslint.config.js',
 ];
 
 export default tseslint.config(

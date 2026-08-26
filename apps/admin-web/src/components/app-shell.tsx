@@ -96,10 +96,11 @@ export function AppShell({
           </div>
           <button
             type="button"
-            onClick={async () => {
-              await signOut.mutateAsync();
-              router.replace('/login');
-              router.refresh();
+            onClick={() => {
+              void signOut.mutateAsync().then(() => {
+                router.replace('/login');
+                router.refresh();
+              });
             }}
             className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]"
           >

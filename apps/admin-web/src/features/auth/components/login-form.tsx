@@ -28,7 +28,7 @@ export function LoginForm({ next, reason }: { next: string; reason?: string }) {
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+    <form onSubmit={(event) => void onSubmit(event)} className="space-y-4" noValidate>
       {reason === 'idle' ? (
         <p
           role="status"
@@ -69,7 +69,7 @@ export function LoginForm({ next, reason }: { next: string; reason?: string }) {
 
       {signIn.isError ? (
         <p role="alert" className="text-sm text-danger-500">
-          {(signIn.error as Error).message}
+          {signIn.error.message}
         </p>
       ) : null}
 
