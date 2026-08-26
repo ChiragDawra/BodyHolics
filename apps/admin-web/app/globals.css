@@ -1,0 +1,116 @@
+@import 'tailwindcss';
+
+/*
+ * The values here mirror packages/ui/src/tokens.ts, which is the shared source
+ * for both clients. Tailwind v4 reads its scale from @theme, and CSS custom
+ * properties cannot be imported from TypeScript, so the ramp is restated once
+ * here rather than duplicated across components.
+ */
+@theme {
+  --color-ink-0: #ffffff;
+  --color-ink-50: #f7f8fa;
+  --color-ink-100: #edeff3;
+  --color-ink-200: #dde1e8;
+  --color-ink-300: #c2c8d2;
+  --color-ink-400: #98a1af;
+  --color-ink-500: #6b7583;
+  --color-ink-600: #4a525e;
+  --color-ink-700: #333a44;
+  --color-ink-800: #1f242c;
+  --color-ink-900: #12161c;
+  --color-ink-950: #0a0d11;
+
+  --color-accent-100: #e4f5ec;
+  --color-accent-300: #7fd8a9;
+  --color-accent-500: #12b76a;
+  --color-accent-600: #0e9355;
+  --color-accent-700: #0a6e40;
+
+  --color-danger-100: #fde7e7;
+  --color-danger-500: #d92d20;
+  --color-danger-700: #912018;
+  --color-warning-100: #fef3e2;
+  --color-warning-500: #f79009;
+  --color-warning-700: #b54708;
+  --color-info-100: #e7f0fe;
+  --color-info-500: #2e7cf6;
+  --color-info-700: #1b4fa8;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+}
+
+/*
+ * Semantic surface variables. Components reference these rather than the ramp
+ * directly, so switching a theme is a change in one block instead of a sweep
+ * through every file.
+ */
+:root {
+  --surface-background: var(--color-ink-50);
+  --surface-card: var(--color-ink-0);
+  --surface-raised: var(--color-ink-0);
+  --surface-border: var(--color-ink-200);
+  --surface-border-strong: var(--color-ink-300);
+  --text-primary: var(--color-ink-900);
+  --text-muted: var(--color-ink-500);
+  --text-inverted: var(--color-ink-0);
+  --accent: var(--color-accent-500);
+  --accent-pressed: var(--color-accent-600);
+  --on-accent: var(--color-ink-0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --surface-background: var(--color-ink-950);
+    --surface-card: var(--color-ink-900);
+    --surface-raised: var(--color-ink-800);
+    --surface-border: var(--color-ink-700);
+    --surface-border-strong: var(--color-ink-600);
+    --text-primary: var(--color-ink-50);
+    --text-muted: var(--color-ink-400);
+    --text-inverted: var(--color-ink-950);
+    --on-accent: var(--color-ink-950);
+  }
+}
+
+:root[data-theme='dark'] {
+  --surface-background: var(--color-ink-950);
+  --surface-card: var(--color-ink-900);
+  --surface-raised: var(--color-ink-800);
+  --surface-border: var(--color-ink-700);
+  --surface-border-strong: var(--color-ink-600);
+  --text-primary: var(--color-ink-50);
+  --text-muted: var(--color-ink-400);
+  --text-inverted: var(--color-ink-950);
+  --on-accent: var(--color-ink-950);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--surface-background);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A focus ring that survives a dark background, on every interactive element. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Tabular figures keep money and counts from shifting as they update. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
