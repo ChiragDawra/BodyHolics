@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { callFunction, resetRateLimits, sql, uuid, SEED } from './helpers';
+import {
+  callFunction,
+  clearPendingMembership,
+  resetRateLimits,
+  sql,
+  uuid,
+  SEED,
+} from './helpers';
 
 /**
  * The counter flow is the one place a staff member can turn a scan into an
@@ -8,12 +15,11 @@ import { callFunction, resetRateLimits, sql, uuid, SEED } from './helpers';
  */
 
 async function orderFor(userId: string, planId: string) {
-  // Clear any pending membership first — D-004 permits only one, and these tests
-  // must not depend on what ran before them.
-  await sql(`
-    update public.memberships set status = 'CANCELLED', cancelled_at = now()
-    where gym_id = '${SEED.gymId}' and user_id = '${userId}' and status = 'PENDING_PAYMENT';
-  `);
+  // Both preconditions, established rather than assumed: D-004 permits one
+  // pending membership, and the per-user hourly limit is low enough that a few
+  // arrange steps in the same file would otherwise trip it.
+  await clearPendingMembership(userId);
+  await resetRateLimits();
 
   const response = await callFunction<{ paymentId: string; amountPaise: number }>(
     'create-payment-order',

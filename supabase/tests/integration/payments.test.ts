@@ -8,6 +8,7 @@ import {
   FUNCTIONS_URL,
   SEED,
   resetRateLimits,
+  clearPendingMembership,
 } from './helpers';
 
 /**
@@ -22,6 +23,8 @@ beforeEach(async () => {
 
 describe('create-payment-order', () => {
   it('takes the amount from the plan, never from the client', async () => {
+    await clearPendingMembership(SEED.priya);
+
     const response = await callFunction<{ amountPaise: number }>('create-payment-order', {
       as: SEED.priya,
       headers: { 'Idempotency-Key': uuid() },
@@ -56,6 +59,10 @@ describe('create-payment-order', () => {
   });
 
   it('replaying an idempotency key returns the original order, not a second one', async () => {
+    // The first call has to succeed for the replay to mean anything, and D-004
+    // refuses a second pending membership.
+    await clearPendingMembership(SEED.neha);
+
     const key = uuid();
     const body = { planId: SEED.plans.quarterly, method: 'CASH_COUNTER' as const };
 
@@ -70,7 +77,7 @@ describe('create-payment-order', () => {
       body,
     });
 
-    expect(first.data?.paymentId).toBeDefined();
+    expect(first.data?.paymentId, JSON.stringify(first.error)).toBeDefined();
     expect(second.data?.paymentId).toBe(first.data?.paymentId);
   });
 

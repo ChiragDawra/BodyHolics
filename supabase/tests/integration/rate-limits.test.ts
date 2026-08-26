@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { callFunction, resetRateLimits, sql, uuid, SEED } from './helpers';
 
 /**
@@ -6,16 +6,15 @@ import { callFunction, resetRateLimits, sql, uuid, SEED } from './helpers';
  * session and an unbounded number of payment orders or QR tokens, so they are
  * tested for real rather than assumed from the presence of the code.
  *
- * The rest of the suite clears these counters in beforeEach; this file is where
- * they are allowed to fire.
+ * The rest of the suite clears these counters in its arrange steps; this file
+ * is where they are allowed to fire. Each test resets them as its first
+ * statement rather than in a beforeEach, so nothing can run between the reset
+ * and the loop that depends on it.
  */
-
-beforeEach(async () => {
-  await resetRateLimits();
-});
 
 describe('rate limiting', () => {
   it('refuses the sixth payment order in an hour with 429 and Retry-After', async () => {
+    await resetRateLimits();
     // The first five are allowed. Each one fails on MEMBERSHIP_ALREADY_PENDING
     // after the first, which is fine — the limiter runs before that check, so
     // the attempt still counts. That ordering is deliberate: a caller must not
@@ -31,11 +30,12 @@ describe('rate limiting', () => {
       statuses.push(response.status);
     }
 
-    expect(statuses.slice(0, 5).every((status) => status !== 429)).toBe(true);
-    expect(statuses[5]).toBe(429);
+    expect(statuses.slice(0, 5).every((status) => status !== 429), `statuses=${statuses}`).toBe(true);
+    expect(statuses[5], `statuses=${statuses}`).toBe(429);
   });
 
   it('counts per user, so one member cannot exhaust another member’s budget', async () => {
+    await resetRateLimits();
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await callFunction('create-payment-order', {
         as: SEED.asha,
@@ -55,6 +55,7 @@ describe('rate limiting', () => {
   });
 
   it('starts a fresh window once the old one has passed', async () => {
+    await resetRateLimits();
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await callFunction('create-payment-order', {
         as: SEED.neha,
@@ -79,6 +80,7 @@ describe('rate limiting', () => {
   });
 
   it('limits QR tokens at 20 per user per hour', async () => {
+    await resetRateLimits();
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 21; attempt += 1) {
       const response = await callFunction('create-member-qr-token', {

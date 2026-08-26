@@ -157,11 +157,7 @@ export async function arrangePendingPayment(params: {
   amountPaise: number;
   orderId: string;
 }): Promise<string> {
-  await sql(`
-    update public.memberships set status = 'CANCELLED', cancelled_at = now()
-    where gym_id = '${SEED.gymId}' and user_id = '${params.userId}'
-      and status = 'PENDING_PAYMENT';
-  `);
+  await clearPendingMembership(params.userId);
 
   const rows = await sql(`
     with m as (
@@ -190,4 +186,30 @@ export async function arrangePendingPayment(params: {
  */
 export async function resetRateLimits(): Promise<void> {
   await sql('delete from public.rate_limits;');
+}
+
+/**
+ * Puts a user back to "no membership awaiting payment".
+ *
+ * D-004 permits one pending membership per member per gym, so any test that
+ * needs to create one has to establish that precondition rather than assume it.
+ * The read-back is not paranoia: an arrange step that fails silently produces a
+ * confusing assertion failure three lines later, in the part of the test that is
+ * actually correct.
+ */
+export async function clearPendingMembership(userId: string): Promise<void> {
+  await sql(`
+    update public.memberships set status = 'CANCELLED', cancelled_at = now()
+    where gym_id = '${SEED.gymId}' and user_id = '${userId}'
+      and status = 'PENDING_PAYMENT';
+  `);
+
+  const [remaining] = await sql(`
+    select count(*) from public.memberships
+    where gym_id = '${SEED.gymId}' and user_id = '${userId}' and status = 'PENDING_PAYMENT';
+  `);
+
+  if (Number(remaining?.value) !== 0) {
+    throw new Error(`could not clear the pending membership for ${userId}`);
+  }
 }
