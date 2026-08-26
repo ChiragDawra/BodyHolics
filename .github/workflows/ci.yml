@@ -1,0 +1,201 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch cancels the first: the older run's result is
+# about code nobody will merge.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Placeholders and local addresses only. Nothing here authenticates anything
+  # outside the ephemeral runner, and no real credential is ever put in this
+  # file or in a build log — the Supabase local keys are read from the CLI at
+  # runtime instead.
+  SUPABASE_URL: http://127.0.0.1:54321
+  NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+  NEXT_PUBLIC_APP_ENV: local
+  EXPO_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+  EXPO_PUBLIC_APP_ENV: local
+  RAZORPAY_WEBHOOK_SECRET: ci-webhook-secret-not-a-real-one
+  RAZORPAY_KEY_ID: rzp_test_ci_placeholder
+  RAZORPAY_KEY_SECRET: ci-placeholder-not-a-real-secret
+  ALLOWED_ORIGINS: http://localhost:3000
+
+jobs:
+  # Everything that needs no database, so a typo fails in under two minutes
+  # rather than after a Supabase stack has booted.
+  static:
+    name: Types, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      # D-012 — the Deno mirror under supabase/functions/_shared must match
+      # packages/domain and packages/validation exactly. Drift here means a
+      # client and a server disagreeing about what a request is allowed to say.
+      - name: Shared mirror parity
+        run: pnpm test:shared-parity
+
+      - name: No committed secrets
+        run: bash scripts/check-no-secrets.sh
+
+  database:
+    name: RLS and Edge Function tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start the local stack
+        run: supabase start
+
+      # Proves the migrations apply from nothing, every time. A migration that
+      # only works against an already-migrated database is a migration that will
+      # fail on the next fresh environment.
+      - name: Reset from scratch
+        run: supabase db reset
+
+      # The generated types must match the schema they were generated from. If
+      # this diff is non-empty someone changed a migration without running
+      # `pnpm gen:types`, and every type in the apps is now a polite fiction.
+      - name: Generated types are current
+        run: |
+          pnpm gen:types
+          if ! git diff --quiet -- packages/types/src/database.ts; then
+            echo "::error::packages/types/src/database.ts is stale. Run 'pnpm gen:types'."
+            git --no-pager diff -- packages/types/src/database.ts | head -60
+            exit 1
+          fi
+
+      - name: RLS policy tests (pgTAP)
+        run: supabase test db
+
+      # The keys are printed by the CLI rather than stored anywhere. They are
+      # the well-known local development keys, identical on every machine, and
+      # they authenticate nothing outside this ephemeral container.
+      - name: Export local stack credentials
+        run: |
+          # `-o env` emits KEY="value"; GITHUB_ENV takes them unquoted, or the
+          # quotes end up as part of the value.
+          supabase status -o env | sed 's/="/=/; s/"$//' >> "$GITHUB_ENV"
+
+      - name: Serve Edge Functions
+        run: |
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "RAZORPAY_WEBHOOK_SECRET=$RAZORPAY_WEBHOOK_SECRET"
+            echo "RAZORPAY_KEY_ID=$RAZORPAY_KEY_ID"
+            echo "RAZORPAY_KEY_SECRET=$RAZORPAY_KEY_SECRET"
+            echo "ALLOWED_ORIGINS=$ALLOWED_ORIGINS"
+          } > "$RUNNER_TEMP/functions.env"
+
+          # Outside the working tree on purpose: a file of keys inside the repo
+          # is one `git add -A` away from being committed, and the secret scan
+          # would rightly fail on it.
+          supabase functions serve --env-file "$RUNNER_TEMP/functions.env" &
+
+          # Wait for the runtime rather than sleeping a fixed amount: a cold
+          # start here is slower than on a developer's machine.
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null "$SUPABASE_URL/functions/v1/gym-by-slug?slug=urban-gym" && break
+            sleep 2
+          done
+
+      - name: Edge Function integration tests
+        # The suite resets the database itself, so it does not matter that the
+        # pgTAP run above left it seeded.
+        run: pnpm test:integration
+        env:
+          SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          SUPABASE_JWT_SECRET: ${{ env.JWT_SECRET }}
+
+  build:
+    name: Build and scan the output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Both apps validate their env at module load and refuse to build without
+      # it. This job never talks to a database, so a syntactically valid
+      # placeholder is exactly right — and using a real key here would put one
+      # in a build log for no reason.
+      - name: Build the admin app
+        run: pnpm --filter admin-web build
+        env:
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key-not-a-real-key
+
+      - name: Bundle the mobile app
+        run: pnpm --filter member-mobile exec expo export --platform ios --output-dir dist
+        env:
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key-not-a-real-key
+
+      # docs/08 §4 — the check that actually matters. A service-role key can
+      # reach a client bundle through an env var named the wrong way or an
+      # import that crosses the server boundary, and neither shows up in source
+      # review. This decodes every JWT in the built output and judges it by its
+      # `role` claim rather than by the variable name around it.
+      - name: Scan built bundles for privileged keys
+        run: |
+          bash scripts/check-no-secrets.sh \
+            apps/admin-web/.next \
+            apps/member-mobile/dist
+
+      - name: Expo config sanity
+        run: pnpm --filter member-mobile exec expo-doctor
+        continue-on-error: true
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high

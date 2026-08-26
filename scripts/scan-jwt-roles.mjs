@@ -2,10 +2,19 @@
 // Supabase keys are JWTs: the anon key is safe, the service_role key is not,
 // and in a built bundle both look like opaque base64. Decode the payload and
 // judge by the `role` claim rather than by the surrounding variable name.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 
 const ROOT = process.cwd();
+
+/**
+ * Paths to scan. Defaults to the repo, but CI passes the built output —
+ * `apps/admin-web/.next` and the Expo bundle — because that is where a key that
+ * leaked through a bundler would actually surface (docs/08 §4). Those
+ * directories are gitignored, so they have to be named explicitly.
+ */
+const TARGETS = process.argv.slice(2).map((p) => resolve(p)).filter((p) => existsSync(p));
+const ROOTS = TARGETS.length > 0 ? TARGETS : [ROOT];
 const SKIP_DIRS = new Set([
   'node_modules',
   '.git',
@@ -34,7 +43,8 @@ function* walk(dir) {
   }
 }
 
-for (const file of walk(ROOT)) {
+for (const scanRoot of ROOTS) {
+for (const file of walk(scanRoot)) {
   let text;
   try {
     if (statSync(file).size > MAX_BYTES) continue;
@@ -51,7 +61,10 @@ for (const file of walk(ROOT)) {
     }
     if (PRIVILEGED.has(claims?.role)) {
       const line = text.slice(0, text.indexOf(token)).split('\n').length;
-      console.log(`${relative(ROOT, file)}:${line}: JWT with role="${claims.role}"`);
+      // Relative to the repo where possible, so the output is clickable.
+      const label = file.startsWith(ROOT) ? relative(ROOT, file) : file;
+      console.log(`${label}:${line}: JWT with role="${claims.role}"`);
     }
   }
+}
 }

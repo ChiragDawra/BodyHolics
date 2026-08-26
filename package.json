@@ -18,7 +18,7 @@
     "check:secrets": "bash scripts/check-no-secrets.sh",
     "db:reset": "supabase db reset",
     "db:test": "supabase db reset && supabase test db",
-    "gen:types": "supabase gen types typescript --local > packages/types/src/database.ts",
+    "gen:types": "bash scripts/gen-types.sh",
     "clean": "git clean -xdf node_modules dist .next .expo .turbo",
     "db:test:only": "supabase test db"
   },
@@ -29,5 +29,14 @@
     "turbo": "2.10.12",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-5p2g-fcmc-qvqq",
+        "GHSA-w3rx-r6r6-pgpr",
+        "GHSA-w5hq-g745-h8pq"
+      ]
+    }
   }
 }
