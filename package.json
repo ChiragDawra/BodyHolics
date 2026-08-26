@@ -1,0 +1,31 @@
+{
+  "name": "urban-gym-app",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "pnpm --filter admin-web test:e2e",
+    "test:shared-parity": "node scripts/check-shared-parity.mjs",
+    "check:secrets": "bash scripts/check-no-secrets.sh",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "gen:types": "supabase gen types typescript --local > packages/types/src/database.ts",
+    "clean": "git clean -xdf node_modules dist .next .expo .turbo"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6",
+    "supabase": "2.115.0",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

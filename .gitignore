@@ -1,0 +1,32 @@
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+.expo/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# env — .env.example is the only committed env file
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# os / editor
+.DS_Store
+*.log
+playwright-report/
+test-results/
+
+# graphify scratch
+graphify-out/
+
+# local tooling state, not project source
+.tokensave/
+.claude/settings.local.json
