@@ -4,8 +4,11 @@
 pushed to `github.com/ChiragDawra/BodyHolics`
 
 The app is structurally complete: schema, backend, both clients, and CI all
-exist and run. What is missing is not code — it is three external accounts and a
-round of hardening.
+exist and run. **Confirmed 27 Aug as a real production build**, not a prototype.
+
+What is missing: two external registrations with real lead times (SMS/DLT and
+Razorpay KYC), applying the Stitch design system, one new feature (D-019 freeze
+requests), and a hardening pass.
 
 ---
 
@@ -120,7 +123,38 @@ workflow was committed.
 
 ---
 
+## Decisions received 27 Aug — recorded as D-017…D-020
+
+| Was | Answer | Effect |
+|---|---|---|
+| Q3 crowd source | Member presence only — QR, install, sign in | Confirms what is built. D-017 |
+| Q4 no-smartphone walk-in | Owner registers them on the owner's phone; member still enters their own OTP | No code change. D-020 |
+| Q7 refunds | None in the app, ever. Handled in person | No code change. D-018 |
+| **Q8 freeze/pause** | **Member raises a request, owner accepts or rejects** | **New feature — see below. D-019** |
+| Q12 portfolio vs production | **Production. Shipping to a real gym** | Raises the bar on everything below |
+
+### D-019 adds scope
+
+A freeze request is not in the model at all. It needs a
+`membership_freeze_requests` table with its own status machine, RLS and audit
+trail, two Edge Functions (member raises, owner decides), and a careful change to
+how `end_at` is computed — an approved freeze extends a paid period, which D-004
+otherwise forbids. Scheduled after the launch blockers.
+
+### Design system received
+
+The Stitch exports have arrived. Member app is dark (`#0c1511` ground, `#8cd5b3`
+mint primary), admin is light (`#f8faf7` ground, `#005239` primary), both on
+Hanken Grotesk with a defined type and spacing scale. **Not yet applied** — the
+apps still use the interim tokens I wrote. This is now a concrete task rather
+than a blocker.
+
+---
+
 ## What I need from you
+
+**Full step-by-step, including how to hand each one over safely, is in
+[CREDENTIALS.md](./CREDENTIALS.md).** The short version:
 
 ### Blocking — work cannot be finished without these
 
@@ -138,28 +172,36 @@ signature verification, amount-mismatch handling and replay behaviour *are*
 tested, against a locally-signed secret.
 → *Need: test keys now, and KYC-completed live keys before launch.*
 
-**3. Design references — the Stitch screens are unresolvable.**
-You gave 7 Stitch screen IDs and asked for Motion/21st/Stitch. **21st and Stitch
-are not connected to this session**, so those IDs are paths I cannot fetch. Both
-apps are built on a design system I defined in `packages/ui/src/tokens.ts` —
-coherent and accessible, but mine, not yours.
-→ *Need: connect the MCP, or paste/export the screens. The longer this waits the
-more there is to rework.*
+**3. ~~Design references~~ — resolved 27 Aug.**
+The Stitch exports arrived as HTML. Both palettes, the Hanken Grotesk type scale
+and the spacing/radius scales are now extractable. Applying them to
+`packages/ui/src/tokens.ts` and both apps is queued work, not a blocker.
 
-### Product decisions — I should not guess these
+### Product decisions
 
-| # | Question | My recommendation |
-|---|---|---|
-| **Q3** | Where does crowd data come from? Currently QR/presence events only | Ship with presence-based; revisit if it reads wrong |
-| **Q4** | The walk-in with no smartphone | Staff-assisted on the member's own phone. Never admin-created identity |
-| **Q7** | Does the owner need an in-app refund button? | Razorpay dashboard only for MVP. Pro-rating is a lot of complexity to build speculatively |
-| **Q8** | Do you offer membership pause/freeze today? | If **yes, tell me now** — it changes how `end_at` is computed and is not in the model at all |
-| **Q10** | Data retention / deletion policy | Needed before launch, not before more code |
-| **Q12** | Portfolio piece or real production deployment? | Changes whether M7 is a week or a month |
+All answered on 27 Aug — see the table at the top. The only one still open is
+**Q10, data retention**, which is explained below.
 
-**Q8 is the one to answer soonest.** Everything else can be decided later
-without rework; a pause feature bolted on afterwards would touch the membership
-period maths, which is the part most carefully tested.
+### Q10 — data retention, explained
+
+You asked what this means. It is two questions, and for a production app in India
+they are worth answering before launch rather than after:
+
+1. **When a member leaves, what happens to their data?** Their phone number,
+   name, payment history and every visit are still in the database. Do they stay
+   forever, or are they deleted or anonymised after some period? "Forever" is a
+   valid answer — it just has to be a decision.
+2. **If a member asks you to delete their data, can you?** India's DPDP Act 2023
+   gives people that right. Right now there is no delete path in the app, so the
+   answer would be a manual database operation.
+
+**My recommendation for launch:** keep everything while a member is active,
+delete nothing automatically, and add an owner-only "delete member" action that
+anonymises the profile while keeping the payment rows for accounting. That is a
+small piece of work, and it is far easier to add now than to retrofit once there
+is real member data.
+
+Nothing is blocked on this — tell me whenever.
 
 ---
 

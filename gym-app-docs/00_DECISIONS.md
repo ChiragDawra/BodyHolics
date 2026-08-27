@@ -159,6 +159,61 @@ policy matrix in `docs/05` §8 verb for verb. Three tables use column grants
 rather than table grants because RLS cannot restrict columns; those must never
 be replaced with a blanket grant.
 
+### D-017 — Crowd is derived from member presence, nothing else
+
+Answers Q3. No sensors, no device fingerprinting, no Wi-Fi probing. A member
+scans the gym QR, installs the app, signs in, and their presence events are the
+only crowd signal.
+
+This keeps `crowd_snapshots` free of any device identifier by construction
+rather than by policy, and it means the number is only as good as app adoption —
+which is why D-008's "fewer than three people present means INSUFFICIENT_DATA"
+matters. An empty-looking gym is reported as unknown, never as quiet.
+
+### D-018 — No refunds in the app, at all
+
+Answers Q7. A member wanting money back talks to the owner directly. There is no
+refund button, no partial refund, and no pro-rating anywhere in the product.
+
+A refund issued in the Razorpay dashboard still reaches us: the webhook marks the
+payment `REFUNDED` and writes an audit row. It deliberately does **not** cancel
+the membership — whether access ends is the owner's call, made in person.
+
+Pro-rating in particular is not being built. "Stayed 15 days, wants half back" is
+a conversation, not a formula.
+
+### D-019 — Membership freeze is a request, not an action
+
+Answers Q8, and this one adds scope rather than removing it.
+
+A member can *raise* a freeze request from the app. It does nothing on its own —
+the owner accepts or rejects it, and only an acceptance changes anything. A
+member can never pause their own membership.
+
+This is not in the current model. It needs, at minimum:
+
+- a `membership_freeze_requests` table with its own status machine
+  (`REQUESTED → APPROVED | REJECTED | CANCELLED`), RLS, and an audit trail;
+- an Edge Function for the member to raise one and another for the owner to
+  decide;
+- a change to how `end_at` is computed, because an approved freeze extends the
+  paid period by the frozen duration. That is the part to be careful with: D-004
+  forbids moving `end_at` for a paid period arbitrarily, so an approved freeze
+  has to be an explicit, audited, bounded extension rather than a free edit.
+
+**Not yet built.** Scheduled after the launch blockers.
+
+### D-020 — The walk-in without a smartphone is handled socially
+
+Answers Q4. Every current member has a phone. If someone arrives without one,
+the owner walks them through registration **on the owner's own device** — the
+member still receives and enters their own OTP, so identity is still proven by
+the phone number.
+
+CLAUDE.md rule 9 stands unchanged: admin has no "Add Member" flow, and identity
+is never created by staff typing someone's details in. Borrowing a handset does
+not break that; an admin-created member would.
+
 ---
 
 ## Part C — Change log
@@ -168,3 +223,4 @@ be replaced with a blanket grant.
 | 2026-08-26 | D-001…D-014 | Initial decisions register created from v1 draft docs |
 | 2026-08-26 | D-015 | Empty-audience outcome defined for the scheduled publish path |
 | 2026-08-26 | D-016 | Table privileges made explicit after discovering no grants were inherited |
+| 2026-08-27 | D-017…D-020 | Q3, Q4, Q7, Q8 answered by the owner. D-019 adds scope: freeze-as-request |
