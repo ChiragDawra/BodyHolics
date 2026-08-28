@@ -160,7 +160,7 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = ["https://127.0.0.1:3000", "urbangym://auth-callback", "http://localhost:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -260,6 +260,20 @@ otp_expiry = 3600
 # enabled = true
 # subject = "Your password has been changed"
 # content_path = "./supabase/templates/password_changed_notification.html"
+
+# D-021 — Google sign-in, for demonstrating the app before the gym owner's own
+# DLT registration exists. Phone OTP remains the intended launch path; this is an
+# additional provider, not a replacement, and both write the same verified
+# identity onto the profile.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+# Never committed. Set it in the dashboard for the hosted project and in
+# .env.local for the local stack.
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+# Where Google returns to. The mobile app deep-links back through the app scheme.
+redirect_uri = ""
+skip_nonce_check = false
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -425,3 +439,11 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# The only function without JWT verification, and deliberately so: Razorpay calls
+# it with no user session. Its authentication is the HMAC signature over the raw
+# request body, checked in constant time before anything touches the database
+# (docs/07 §5). Turning this on would break the webhook; turning it off anywhere
+# else would remove the only thing standing in front of that function.
+[functions.razorpay-webhook]
+verify_jwt = false

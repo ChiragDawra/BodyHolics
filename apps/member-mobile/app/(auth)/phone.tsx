@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Body, Button, Caption, Heading, Screen } from '@/components/ui';
 import { spacing, radius, fontSize, useTheme } from '@/theme';
-import { fetchGymBySlug, requestOtp } from '@/features/auth/api';
+import { fetchGymBySlug, requestOtp, signInWithGoogle } from '@/features/auth/api';
 import { phoneSchema } from '@/features/auth/schemas';
 
 export default function PhoneScreen() {
@@ -25,6 +25,18 @@ export default function PhoneScreen() {
     mutationFn: requestOtp,
     onSuccess: (_data, phone) => router.push(`/(auth)/otp?phone=${encodeURIComponent(phone)}&gymSlug=${gymSlug}`),
     onError: (mutationError: Error) => setError(mutationError.message),
+  });
+
+  const google = useMutation({
+    mutationFn: signInWithGoogle,
+    // Straight to the profile step: the session exists, but a gym_members row
+    // does not, and an account without one grants nothing.
+    onSuccess: () => router.replace(`/(onboarding)/profile?gymSlug=${gymSlug}`),
+    onError: (mutationError: Error) => {
+      // Closing the browser sheet is not a failure worth a red message.
+      if (mutationError.message === 'SIGN_IN_CANCELLED') return;
+      setError(mutationError.message);
+    },
   });
 
   function onSubmit() {
@@ -83,6 +95,21 @@ export default function PhoneScreen() {
         {error ? <Body style={{ color: theme.danger }}>{error}</Body> : null}
 
         <Button title="Send code" onPress={onSubmit} loading={send.isPending} />
+
+        {/* D-021 — the demo path, until the gym's own DLT registration exists.
+            Both routes end at the same place: a verified identity on the JWT. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+          <Caption>or</Caption>
+          <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+        </View>
+
+        <Button
+          title="Continue with Google"
+          variant="secondary"
+          onPress={() => google.mutate()}
+          loading={google.isPending}
+        />
       </KeyboardAvoidingView>
     </Screen>
   );

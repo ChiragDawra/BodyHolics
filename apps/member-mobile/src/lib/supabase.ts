@@ -65,6 +65,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 export const appEnv = (extra.appEnv as string | undefined) ?? 'local';
 
 /**
+ * The publishable key. It ships inside the bundle by design — it identifies the
+ * project, it does not authorize anything. RLS decides what a request may do.
+ */
+export const anonKey = supabaseAnonKey;
+
+/**
  * The Edge Function base URL. Derived from the same config the client was built
  * with — `supabase.functions.url` is protected, and reaching into a private
  * field is how a library upgrade breaks the app silently.
