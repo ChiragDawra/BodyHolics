@@ -13,6 +13,15 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
   NEXT_PUBLIC_APP_ENV: z.enum(['local', 'staging', 'production']).default('local'),
+  // The domain a bare staff username is completed with at the login form.
+  // Publishable: it appears in the login request and in the account's own
+  // address. Must match what `scripts/bootstrap-gym.mjs` created the account
+  // under, or the owner's username resolves to an address that does not exist.
+  NEXT_PUBLIC_ADMIN_USERNAME_DOMAIN: z
+    .string()
+    .min(3)
+    .regex(/^[^@\s]+\.[^@\s]+$/, 'must be a bare domain, without an @')
+    .default('staff.bodyholics.app'),
 });
 
 // Next replaces these member expressions at build time, so they must be written
@@ -21,6 +30,7 @@ const parsed = clientEnvSchema.safeParse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+  NEXT_PUBLIC_ADMIN_USERNAME_DOMAIN: process.env.NEXT_PUBLIC_ADMIN_USERNAME_DOMAIN,
 });
 
 if (!parsed.success) {

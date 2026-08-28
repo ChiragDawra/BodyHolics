@@ -88,17 +88,37 @@ export async function requireMember(req: Request): Promise<AuthResult> {
   return { ok: true, userId: user.userId, gymId: data.gym_id };
 }
 
+export type VerifiedIdentity = {
+  /** E.164, present only when the phone was actually confirmed. */
+  phone: string | null;
+  /** Present only when the email was actually confirmed. */
+  email: string | null;
+};
+
 /**
- * The phone on the JWT is the identity (docs/04 §3). A phone in a request body
- * is a claim, not a fact, and is never accepted.
+ * The identity on the JWT (docs/04 §3, extended by D-021). A phone or email in
+ * a request body is a claim, not a fact, and is never accepted.
+ *
+ * `*_confirmed_at` is the part that matters. A user row can carry an
+ * unconfirmed email — someone typed it, nobody proved it — and treating that as
+ * an identity would let one person claim another's address. Only confirmed
+ * values are returned.
  */
-export async function userPhone(req: Request): Promise<string | null> {
+export async function verifiedIdentity(req: Request): Promise<VerifiedIdentity> {
   const token = bearer(req);
-  if (!token) return null;
+  if (!token) return { phone: null, email: null };
 
   const admin = createAdminClient();
   const { data } = await admin.auth.getUser(token);
-  return data.user?.phone ? `+${data.user.phone.replace(/^\+/, '')}` : null;
+  const user = data.user;
+  if (!user) return { phone: null, email: null };
+
+  return {
+    phone: user.phone && user.phone_confirmed_at ? `+${user.phone.replace(/^\+/, '')}` : null,
+    // Lowercased on the way in, matching the case-insensitive unique index, so
+    // Asha@x.com and asha@x.com cannot become two members.
+    email: user.email && user.email_confirmed_at ? user.email.toLowerCase() : null,
+  };
 }
 
 /** Raw token, for the rare case a function needs to act as the user under RLS. */

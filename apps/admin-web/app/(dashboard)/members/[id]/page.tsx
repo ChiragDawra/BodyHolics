@@ -40,7 +40,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{member.fullName}</h1>
           <p className="numeric mt-1 text-sm text-[var(--text-muted)]">
-            {member.memberCode} · {member.maskedPhone} · joined{' '}
+            {member.memberCode} · {member.maskedContact} · joined{' '}
             {formatInGymZone(member.joinedAt, session.timezone)}
           </p>
         </div>

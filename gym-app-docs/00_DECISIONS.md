@@ -214,6 +214,95 @@ CLAUDE.md rule 9 stands unchanged: admin has no "Add Member" flow, and identity
 is never created by staff typing someone's details in. Borrowing a handset does
 not break that; an admin-created member would.
 
+### D-021 — Google sign-in alongside phone OTP
+
+`docs/04` §3 specifies phone OTP only, and that is still the intended launch
+path. But Indian SMS requires DLT registration against the **gym owner's**
+business documents, and those cannot be obtained before the owner has seen the
+app working. That is a genuine ordering problem, not an excuse to skip auth.
+
+Google sign-in is therefore added as a second provider. The property that
+actually protects members is unchanged:
+
+> the identity is read from a **verified claim on the JWT**, never from a
+> request body.
+
+`verifiedIdentity()` only returns a value when the matching `*_confirmed_at` is
+set, so an unconfirmed address — one somebody typed but nobody proved — is
+treated as no identity at all.
+
+Schema follows: `profiles.phone` becomes nullable, `profiles.email` is added
+with a case-insensitive unique index, and a `profile_has_identity` check keeps
+every profile to at least one verified identity. Dropping `not null` without
+that check would have been a quiet loosening of the model.
+
+**Two things this costs, stated plainly:**
+
+1. **No phone number for a Google member.** The gym cannot ring them, and staff
+   at the counter identify them by `member_code` rather than by phone. Fine for
+   a demo; the owner should know before it is the launch path.
+2. **No cross-provider account linking.** Someone who signs up with Google and
+   later with the same person's phone gets two `auth.users` rows and therefore
+   two memberships. Supabase links accounts only when the *email* matches, which
+   phone signup does not provide. Not solved here. If both providers are live at
+   once this needs designing — a duplicate member is a duplicate paid membership.
+
+**To revert to phone-only** once DLT clears: disable the Google provider in the
+Supabase dashboard. No code change is required, because both paths already write
+the same profile shape. The nullable `phone` column stays, which is correct —
+any member who joined through Google still has no phone.
+
+### D-022 — Both clients ship as installable PWAs, and staff sign in with a username
+
+Two changes made together, because they exist for the same reason: the owner has
+to be able to open this on their own phone today, before Play Store review, before
+TestFlight, and before the DLT registration that D-021 is already working around.
+
+**The web build.** `apps/admin-web` was already a web app; it gains a manifest, a
+service worker and the iOS icon meta that make it installable. `apps/member-mobile`
+gains a web target (`expo export --platform web`) alongside the native builds — the
+same Expo Router tree, rendered by `react-native-web`. Native is unaffected.
+
+Consequences worth stating rather than discovering:
+
+- **`output: 'single'`, not `'static'`.** Static rendering executes every route in
+  Node at export time, and this app reads a stored Supabase session before it
+  renders anything — the export dies on `window is not defined`. Every screen is
+  behind a login, so there is no prerendered HTML worth having anyway.
+- **`app/+html.tsx` does not apply** under `single`, so the PWA head tags are
+  injected by `scripts/finish-web-export.mjs`. That script is the only reason it
+  exists; if the app ever moves to static rendering, it should be deleted and the
+  tags moved back into `+html.tsx`.
+- **QR scanning does not work on iOS web.** `expo-camera` decodes on the web via
+  the browser's `BarcodeDetector`, which Safari does not implement. The scan
+  screen therefore offers typed entry of the gym code when the API is absent —
+  validated by the same `gymSlugSchema`, because a code read off a wall by eye is
+  exactly as untrusted as one read by a camera. Native still scans.
+- **Neither service worker caches an authenticated response.** Both cache hashed
+  build output and a static offline page, and nothing else. This matters most on
+  the admin side, where every page holds member phone numbers and a cached page
+  outlives the session that was allowed to see it. The rule is written into both
+  files so a later "make it feel faster" change has to argue with it.
+
+**The username.** Supabase Auth has no username concept — every password account
+is keyed by an email address. So the login field takes an *identifier* and
+`resolveLoginEmail()` completes a bare one against
+`NEXT_PUBLIC_ADMIN_USERNAME_DOMAIN`; `ChiragDawra` becomes
+`chiragdawra@staff.bodyholics.app`. An address typed in full passes through.
+
+This is a convenience layer over a real account, not a bypass. There is no
+hardcoded credential anywhere in either client — a client-side login check would
+also simply not work, because the console holds no elevated credential and every
+page it renders is fetched under RLS with the signed-in user's own JWT. A fake
+session would produce a console with nothing in it.
+
+`scripts/seed-demo-owner.mjs` creates that account, with a deliberately weak,
+easily-typed password. It refuses to run against a non-local project without an
+explicit flag, and refuses outright once the gym has members — at which point the
+database holds real phone numbers and a known password is no longer a demo
+convenience. Hardening it is one password change in the dashboard; there is no
+code to remove.
+
 ---
 
 ## Part C — Change log
@@ -224,3 +313,5 @@ not break that; an admin-created member would.
 | 2026-08-26 | D-015 | Empty-audience outcome defined for the scheduled publish path |
 | 2026-08-26 | D-016 | Table privileges made explicit after discovering no grants were inherited |
 | 2026-08-27 | D-017…D-020 | Q3, Q4, Q7, Q8 answered by the owner. D-019 adds scope: freeze-as-request |
+| 2026-08-27 | D-021 | Google sign-in added so the demo can happen before the owner's DLT registration |
+| 2026-08-28 | D-022 | Both clients ship as installable PWAs; staff sign in with a username |

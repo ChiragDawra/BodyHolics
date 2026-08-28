@@ -13,6 +13,17 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        // A service worker cached by the browser pins the app to the build that
+        // installed it: the next deploy ships, and the worker that decides what
+        // to serve is still the old one. `no-cache` makes the browser
+        // revalidate, which is what lets a fix actually reach an installed PWA.
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },

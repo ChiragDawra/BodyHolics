@@ -27,6 +27,26 @@ const config: ExpoConfig = {
     adaptiveIcon: { backgroundColor: '#0A0D11' },
     permissions: ['CAMERA'],
   },
+  /**
+   * The member app also ships as an installable web app, so a member can join
+   * from a link before either store listing exists.
+   *
+   * `single` — one `index.html`, routed on the client — rather than `static`.
+   * Static rendering runs every route in Node at export time, and this app signs
+   * in before it renders: the Supabase client reads a stored session, which
+   * touches `window`, and the export dies with `ReferenceError: window is not
+   * defined`. That is not a bug to fix, it is what an auth-gated SPA is. Nothing
+   * here benefits from prerendered HTML anyway — every screen is behind a login.
+   *
+   * The consequence is that `app/+html.tsx` does not apply (Expo only uses it
+   * when static rendering), so the PWA head tags are injected into the exported
+   * `index.html` by `scripts/finish-web-export.mjs`, which `build:web` runs.
+   */
+  web: {
+    bundler: 'metro',
+    output: 'single',
+    favicon: './public/icons/favicon.png',
+  },
   plugins: [
     'expo-router',
     'expo-secure-store',

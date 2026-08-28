@@ -43,7 +43,7 @@ export default async function MembersPage({
               <tr>
                 <Th>Member</Th>
                 <Th>Code</Th>
-                <Th>Phone</Th>
+                <Th>Contact</Th>
                 <Th>Status</Th>
                 <Th>Renews</Th>
                 <Th>Joined</Th>
@@ -58,7 +58,7 @@ export default async function MembersPage({
                     </Link>
                   </Td>
                   <Td className="numeric text-[var(--text-muted)]">{member.memberCode}</Td>
-                  <Td className="numeric text-[var(--text-muted)]">{member.maskedPhone}</Td>
+                  <Td className="numeric text-[var(--text-muted)]">{member.maskedContact}</Td>
                   <Td>
                     <MemberStatusBadge status={member.membershipStatus} />
                   </Td>

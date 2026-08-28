@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { maskPhone } from '@/lib/format';
+import { maskedContact } from '@/lib/format';
 import type { MemberDetail, MemberListRow, MemberStatus } from './types';
 
 /**
@@ -35,7 +35,7 @@ export async function listMembers(
   // number in the response for a list that only renders a masked one.
   let membersQuery = supabase
     .from('gym_members')
-    .select('user_id, member_code, joined_at, status, profiles!inner(full_name, phone)')
+    .select('user_id, member_code, joined_at, status, profiles!inner(full_name, phone, email)')
     .eq('gym_id', gymId)
     .order('joined_at', { ascending: false })
     .limit(200);
@@ -82,7 +82,7 @@ export async function listMembers(
       userId: row.user_id,
       memberCode: row.member_code,
       fullName: row.profiles.full_name,
-      maskedPhone: maskPhone(row.profiles.phone),
+      maskedContact: maskedContact(row.profiles.phone, row.profiles.email),
       joinedAt: row.joined_at,
       ...derived,
     };
@@ -95,7 +95,7 @@ export async function getMember(gymId: string, userId: string): Promise<MemberDe
   const [member, current, memberships, payments] = await Promise.all([
     supabase
       .from('gym_members')
-      .select('user_id, member_code, joined_at, status, profiles!inner(full_name, phone)')
+      .select('user_id, member_code, joined_at, status, profiles!inner(full_name, phone, email)')
       .eq('gym_id', gymId)
       .eq('user_id', userId)
       .maybeSingle(),
@@ -130,7 +130,7 @@ export async function getMember(gymId: string, userId: string): Promise<MemberDe
     userId: member.data.user_id,
     memberCode: member.data.member_code,
     fullName: member.data.profiles.full_name,
-    maskedPhone: maskPhone(member.data.profiles.phone),
+    maskedContact: maskedContact(member.data.profiles.phone, member.data.profiles.email),
     joinedAt: member.data.joined_at,
     gymMemberStatus: member.data.status as 'ACTIVE' | 'BLOCKED',
     ...derived,

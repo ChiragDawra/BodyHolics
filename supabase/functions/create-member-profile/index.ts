@@ -7,7 +7,7 @@
 // why `createMemberProfileSchema` has no phone field at all.
 
 import { withRequestId, ok, fail, fieldErrors } from '../_shared/response.ts';
-import { requireUser, userPhone } from '../_shared/auth.ts';
+import { requireUser, verifiedIdentity } from '../_shared/auth.ts';
 import { createAdminClient } from '../_shared/db.ts';
 import { createMemberProfileSchema } from '../_shared/schemas/requests.ts';
 import { AppError } from '../_shared/errors.ts';
@@ -32,14 +32,14 @@ Deno.serve(
     const admin = createAdminClient();
 
     try {
-      // Step 1. The phone must be *verified*, not merely present. An unverified
-      // phone is an unproven claim, and this row is the identity everything else
-      // hangs off.
-      const { data: authUser } = await admin.auth.admin.getUserById(user.userId);
-      if (!authUser.user?.phone_confirmed_at) throw new AppError('UNAUTHENTICATED');
-
-      const phone = await userPhone(req);
-      if (!phone) throw new AppError('UNAUTHENTICATED');
+      // Step 1. The identity must be *verified*, not merely present. An
+      // unverified phone or email is an unproven claim — someone typed it,
+      // nobody proved it — and this row is what everything else hangs off.
+      //
+      // Either provider is accepted (D-021), but at least one confirmed value
+      // is required, which is the same constraint the database enforces.
+      const identity = await verifiedIdentity(req);
+      if (!identity.phone && !identity.email) throw new AppError('UNAUTHENTICATED');
 
       // Step 2.
       const { data: gym } = await admin
@@ -52,17 +52,26 @@ Deno.serve(
       if (!gym.is_active) throw new AppError('GYM_INACTIVE');
 
       // Step 3. Upsert, so re-running after a dropped connection is harmless.
+      // Both identity values come from the JWT; the body carries neither.
       const { error: profileError } = await admin.from('profiles').upsert(
         {
           id: user.userId,
           full_name: parsed.data.fullName,
-          phone, // from the JWT
+          phone: identity.phone,
+          email: identity.email,
           ...(parsed.data.dateOfBirth ? { date_of_birth: parsed.data.dateOfBirth } : {}),
         },
         { onConflict: 'id' },
       );
 
-      if (profileError) throw new AppError('INTERNAL_ERROR');
+      if (profileError) {
+        // 23505 is the unique violation on phone or lower(email): this identity
+        // already belongs to a different account. Saying so plainly beats a
+        // generic 500, and it names a real situation — someone who signed up by
+        // phone earlier now returning through Google with the same address.
+        if (profileError.code === '23505') throw new AppError('FORBIDDEN');
+        throw new AppError('INTERNAL_ERROR');
+      }
 
       // Step 4. Idempotent: a second call returns the existing membership row
       // rather than minting a second member code.
@@ -114,7 +123,7 @@ Deno.serve(
 
       const { data: profile } = await admin
         .from('profiles')
-        .select('id, full_name, phone, avatar_path')
+        .select('id, full_name, phone, email, avatar_path')
         .eq('id', user.userId)
         .single();
 
@@ -131,8 +140,9 @@ Deno.serve(
           profile: {
             id: profile!.id,
             fullName: profile!.full_name,
-            // Returned to its own owner, who already knows it.
+            // Returned to its own owner, who already knows both.
             phone: profile!.phone,
+            email: profile!.email,
             avatarUrl,
           },
           member: {

@@ -4,7 +4,8 @@ export type MemberListRow = {
   userId: string;
   memberCode: string;
   fullName: string;
-  maskedPhone: string;
+  /** Phone if they signed up by OTP, masked email if by Google (D-021). */
+  maskedContact: string;
   joinedAt: string;
   membershipStatus: MemberStatus;
   endAt: string | null;

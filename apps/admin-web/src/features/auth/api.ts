@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { StaffLoginInput } from './schemas';
+import { resolveLoginEmail, type StaffLoginInput } from './schemas';
 
 /**
  * The only place in the admin app that talks to Supabase Auth. `signOut` is here
@@ -7,7 +7,10 @@ import type { StaffLoginInput } from './schemas';
  */
 export async function signInWithPassword(input: StaffLoginInput) {
   const supabase = createClient();
-  const { error } = await supabase.auth.signInWithPassword(input);
+  const { error } = await supabase.auth.signInWithPassword({
+    email: resolveLoginEmail(input.identifier),
+    password: input.password,
+  });
 
   if (error) {
     // Deliberately one message for both "no such account" and "wrong password".

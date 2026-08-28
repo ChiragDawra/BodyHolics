@@ -17,7 +17,7 @@ export function LoginForm({ next, reason }: { next: string; reason?: string }) {
     formState: { errors, isSubmitting },
   } = useForm<StaffLoginInput>({
     resolver: zodResolver(staffLoginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { identifier: '', password: '' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -39,17 +39,22 @@ export function LoginForm({ next, reason }: { next: string; reason?: string }) {
       ) : null}
 
       <div className="space-y-1.5">
-        <Label htmlFor="email">Work email</Label>
+        <Label htmlFor="identifier">Username or work email</Label>
         <Input
-          id="email"
-          type="email"
+          id="identifier"
+          // Deliberately `text`, not `email`: the browser's own email validation
+          // would reject a bare username before the form ever sees it.
+          type="text"
           autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoFocus
-          aria-invalid={errors.email ? true : undefined}
-          {...register('email')}
+          aria-invalid={errors.identifier ? true : undefined}
+          {...register('identifier')}
         />
-        {errors.email ? (
-          <p className="text-xs text-danger-500">Enter a valid email address.</p>
+        {errors.identifier ? (
+          <p className="text-xs text-danger-500">Enter your username or email address.</p>
         ) : null}
       </div>
 

@@ -28,6 +28,16 @@ EXCLUDES=(
   # so that importing them fails lint. Flagging it would mean the only way to
   # pass the check is to delete the rule that enforces it.
   --exclude=base.js
+  # The one operator-side module that is *supposed* to hold the service key.
+  # Hard rule 3 forbids the key in a shipped client — `apps/*`, a NEXT_PUBLIC_ /
+  # EXPO_PUBLIC_ var, a committed fixture. scripts/lib/supabase-admin.mjs is
+  # none of those: it is Node-only, never bundled, and reads the key at runtime
+  # from supabase/.env.production, which git ignores. Bootstrapping the first
+  # OWNER (docs/04 §4) cannot be done without it.
+  #
+  # It names the identifier; it does not contain a key. Tiers 2 and 3 still scan
+  # this file, so real key material committed here is still caught.
+  --exclude=supabase-admin.mjs
 )
 # Prose in docs/ names these identifiers on purpose; tier 3 still decodes any
 # real key material that lands in a markdown file.
