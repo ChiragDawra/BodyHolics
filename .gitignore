@@ -30,3 +30,5 @@ graphify-out/
 # local tooling state, not project source
 .tokensave/
 .claude/settings.local.json
+.vercel
+.env*
