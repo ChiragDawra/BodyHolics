@@ -209,3 +209,40 @@ also works with JavaScript disabled.
 
 `/admin/login` distinguishes "not signed in" from "signed in but not staff" and
 offers sign-out in the second case.
+
+---
+
+## Phase 4 — Member app
+
+### D27. Demo data is seeded as a migration, with a deletable marker
+
+`20260901001000_demo_data.sql` creates 20 members with memberships, six weeks of
+attendance, and two alerts, so the pitch shows a working gym rather than a set
+of zeroes. Every demo account uses the `@demo.bodyholics` email domain, so
+`delete from auth.users where email like '%@demo.bodyholics'` removes all of it
+and the foreign key cascades clean up the rest.
+
+The rows are inserted straight into `auth.users` with no password and no
+identity row, so none of them can be signed in to — they exist only as data.
+Real members still arrive through Google and the `handle_new_user` trigger,
+untouched by any of this.
+
+### D28. The crowd level is four bars, not a percentage
+
+The owner sets this by hand from the desk. A precise-looking "68% full" would
+claim accuracy the data does not have. Four bars reads honestly and is legible
+across a loud room. It carries `role="meter"` with an `aria-valuetext` so it is
+not just a row of coloured divs to a screen reader.
+
+### D29. Member pages are `force-dynamic`
+
+Opening hours, crowd level, and membership status all change through the day.
+A cached member home screen showing "Open now" on a closed gym is the one
+failure this app cannot have.
+
+### D30. Google avatars use `unoptimized`
+
+`next/image` would otherwise proxy every avatar through the Vercel image
+optimizer, which on the Hobby plan is a metered resource spent on a 56px circle.
+The alternative — adding `lh3.googleusercontent.com` to `remotePatterns` — still
+pays that cost.
