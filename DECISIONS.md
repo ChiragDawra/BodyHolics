@@ -90,3 +90,82 @@ Reading it was blocked by the sandbox, and no workaround was attempted. This is
 why `/check` uses PIN-gated RPCs (D1) rather than a server-side service-role
 client. The design is arguably better for it: the privileged path is five
 audited SQL functions instead of a key that can do anything.
+
+---
+
+## Phase 2 — Tokens, primitives, PWA
+
+### D12. The blank token values in the brief were filled in, not left empty
+
+The spec supplied some hex values and left others blank (`--color-ink`,
+`--color-brand`, `--color-success`, the crowd buckets, and others). Those were
+chosen to sit with the supplied ones: brand `#E1502A` (rusted iron orange),
+ink `#1A1917` — a true warm near-black rather than the tinted `#0B0B0B` the
+design pipeline explicitly rejects. Every dark-mode value was supplied and is
+used verbatim.
+
+### D13. Fonts load through `next/font/google`, not a `<link>` to Google Fonts
+
+The brief says "import DM Sans and Inter from Google Fonts in root layout".
+`next/font/google` does exactly that at build time and then self-hosts the
+files, which removes a render-blocking third-party round trip — the audience is
+on patchy 4G. The token file still owns the font names: `--font-display` and
+`--font-body` point at the CSS variables `next/font` generates.
+
+### D14. `--spacing` added alongside `--space-unit`
+
+Tailwind v4 derives its entire spacing scale from `--spacing`. Without it, every
+`p-4`/`gap-3` in the app would come from Tailwind's built-in default rather than
+the token file, which would quietly break the "every value flows from `@theme`"
+rule. Both are `0.25rem`.
+
+### D15. Dark mode is a plain `:root` override, not a nested `@theme`
+
+A `@theme` block nested inside `@media` is not valid Tailwind v4. Since `@theme`
+compiles to custom properties on `:root`, redefining the same names inside
+`@media (prefers-color-scheme: dark)` achieves the same thing and is what
+actually works.
+
+### D16. Both manifests are route handlers, not the `app/manifest.ts` convention
+
+The file convention injects one `<link rel="manifest">` into every page in the
+app. The owner's `/check` app needs a different manifest with its own
+`start_url` and `scope`, so each route group links its own and the convention is
+not used.
+
+### D17. The service worker is registered per route group, not at the root
+
+`/app` and `/check` mount the registrar; the public landing page does not. A
+visitor who reads the landing page and leaves should not have a service worker
+installed for an app they never opened.
+
+### D18. Icons generated from one vector master with the `sharp` that ships with Next
+
+`scripts/generate-icons.mjs` renders all six artefacts from
+`design/icon-master.svg`. No new dependency: it uses Next's own transitive
+`sharp`. The `.ico` is a hand-built container around a 32×32 PNG because sharp
+cannot write ICO. Outputs are committed, so the script only runs when the mark
+changes.
+
+The first version of the mark was a ring whose square hub fell inside the ring's
+inner radius, so it rendered as a plain donut. Reworked to a solid disc with a
+square hole cut out of it, which is what makes it not read as a generic circle
+at 32px.
+
+### D19. `/check` was wired to real data in Phase 2 rather than Phase 6
+
+Phase 2 asked for placeholder cards and Phase 6 for real data. The RPCs already
+existed from Phase 1, so building the dashboard twice would have been wasted
+work. Phase 6 becomes verification of what is already live.
+
+### D20. Three React Compiler lint errors fixed by restructuring, not by disabling
+
+`next lint` runs the React Compiler rules, which reject setting state
+synchronously inside an effect. Rather than suppress them:
+- `usePlatform` now reads the browser through `useSyncExternalStore`.
+- `PinPad` decides the outcome in the keypress handler, since reaching the
+  fourth digit *is* the submit.
+- `CheckDashboard` extracts a pure `fetchDashboard()` so state is only set
+  after an await.
+
+All three are better code than what they replaced.

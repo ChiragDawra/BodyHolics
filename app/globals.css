@@ -1,8 +1,176 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens. The single source of truth for every colour, size, and
+   radius in the app.
+
+   A raw hex value, font name, or pixel size anywhere outside this file is a
+   bug — it means the design can no longer be changed in one place.
+
+   Colours are named by role, never by hue: --color-brand, not --color-orange.
+   Swapping the palette is an edit to this block and nothing else.
+--------------------------------------------------------------------------- */
+
 @theme {
-  /* Design tokens live here and nowhere else.
-     Filled in during the design phase from the chosen design/stitch/ export.
-     A raw hex value, font name, or pixel size anywhere outside this block
-     is a bug — it means the design can no longer be changed in one place. */
+  /* Surfaces, back to front */
+  --color-surface: #FAFAF8;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F0EFEB;
+
+  /* Text */
+  --color-ink: #1A1917;
+  --color-ink-muted: #6B6A63;
+
+  /* Brand — the orange of rusted iron under gym lighting */
+  --color-brand: #E1502A;
+  --color-brand-hover: #C6431F;
+  --color-brand-subtle: #FFF0EB;
+  --color-on-brand: #FFFFFF;
+
+  /* Lines */
+  --color-border: #E2E1DC;
+  --color-border-strong: #C9C7C0;
+
+  /* Status */
+  --color-success: #1E8E3E;
+  --color-success-subtle: #EDFBF0;
+  --color-warning: #B26B00;
+  --color-warning-subtle: #FFF8E5;
+  --color-danger: #D93025;
+  --color-danger-subtle: #FFF0EE;
+
+  /* How busy the gym is. Semantic — these must survive a palette change. */
+  --color-crowd-low: #1E8E3E;
+  --color-crowd-mid: #E8A610;
+  --color-crowd-high: #E1502A;
+  --color-crowd-peak: #D93025;
+
+  /* Type. Two faces, obviously different — a subtle contrast reads as an
+     accident. DM Sans is the voice; Inter carries the reading. */
+  --font-display: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+  --font-body: var(--font-inter), "Inter", system-ui, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+
+  --space-unit: 0.25rem;
+  /* Tailwind derives its whole spacing scale from this. */
+  --spacing: 0.25rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
 }
+
+/* Dark mode is one token block override, not a sweep through every component.
+   `@theme` above compiles to custom properties on `:root`, so redefining the
+   same names here is all that dark mode is. Nothing else in the app changes.
+
+   This is plain CSS on purpose — a nested `@theme` inside `@media` is not
+   valid Tailwind v4. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #141413;
+    --color-surface-raised: #1E1E1C;
+    --color-surface-sunken: #0A0A09;
+
+    --color-ink: #EAEAE6;
+    --color-ink-muted: #9C9C96;
+
+    --color-brand: #F06840;
+    --color-brand-hover: #FF7D55;
+    --color-brand-subtle: #2A1610;
+    --color-on-brand: #FFFFFF;
+
+    --color-border: #2E2E2B;
+    --color-border-strong: #444440;
+
+    --color-success: #3AAF57;
+    --color-success-subtle: #0F2016;
+    --color-warning: #E8A610;
+    --color-warning-subtle: #1F1800;
+    --color-danger: #F04438;
+    --color-danger-subtle: #200A08;
+
+    --color-crowd-low: #3AAF57;
+    --color-crowd-mid: #E8A610;
+    --color-crowd-high: #F06840;
+    --color-crowd-peak: #F04438;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* Focus is never invisible. Every interactive element gets this ring. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Tap targets on phones should not flash a blue box. */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Respect the system setting. Anything decorative stops moving. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes bh-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+@keyframes bh-pulse-ring {
+  0%   { transform: scale(0.9); opacity: 0.7; }
+  70%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes bh-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes bh-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bh-shake { animation: bh-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+.bh-rise  { animation: bh-rise 0.18s ease-out both; }

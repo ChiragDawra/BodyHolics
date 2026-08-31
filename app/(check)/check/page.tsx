@@ -1,10 +1,5 @@
-import { strings } from "@/lib/strings";
+import { CheckApp } from "@/components/check/CheckApp";
 
 export default function CheckPage() {
-  return (
-    <main>
-      <h1>{strings.check.title}</h1>
-      <p>{strings.check.intro}</p>
-    </main>
-  );
+  return <CheckApp />;
 }
