@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  /* Design tokens live here and nowhere else.
+     Filled in during the design phase from the chosen design/stitch/ export.
+     A raw hex value, font name, or pixel size anywhere outside this block
+     is a bug — it means the design can no longer be changed in one place. */
+}
