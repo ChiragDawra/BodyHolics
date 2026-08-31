@@ -1,18 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { Database } from "./database.types";
 
 /**
- * Refreshes the Supabase auth session and writes the rotated cookies onto the
- * outgoing response. Call this from the root `middleware.ts` once routes need
- * auth; it is not wired up yet.
+ * Refreshes the Supabase auth session and gates the protected route groups.
  *
  * Do not add logic between `createServerClient` and `getUser()` — anything that
  * runs in between can leave a user randomly signed out.
+ *
+ * `/check/*` is deliberately absent: it has no session at all and is gated by
+ * the PIN pad plus PIN-verifying RPCs instead.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -33,7 +35,23 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  // Members: no session means they have not joined yet.
+  if (pathname.startsWith("/app") && !user) {
+    return NextResponse.redirect(new URL("/join", request.url));
+  }
+
+  // Staff: the session check happens here, but being staff is verified again
+  // server-side on the page itself. Middleware alone is not the authorisation
+  // boundary — RLS is.
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login" && !user) {
+    return NextResponse.redirect(new URL("/admin/login", request.url));
+  }
 
   return supabaseResponse;
 }

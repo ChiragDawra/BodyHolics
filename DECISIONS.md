@@ -169,3 +169,43 @@ synchronously inside an effect. Rather than suppress them:
   after an await.
 
 All three are better code than what they replaced.
+
+---
+
+## Phase 3 — Auth
+
+### D21. A missing `?g=` join code is allowed; only a *wrong* code is rejected
+
+The spec says `/join?g=<code>` validates the code. A bare `/join` with no code
+at all is treated as valid rather than shown the error screen — the owner will
+share the plain link too, and a member who cannot get past a "no code" screen
+is a member who does not join. A code that is present but does not match is
+still rejected.
+
+### D22. `getUser()` everywhere on the server, never `getSession()`
+
+`getSession()` reads the cookie without verifying it, so its contents can be
+forged. Every server-side auth check revalidates the token with Supabase.
+
+### D23. Middleware is not the authorisation boundary
+
+Middleware checks only that a session exists, because it runs before RLS and
+can be bypassed by anything reaching a route handler directly. Staff membership
+is verified again server-side on the page via `is_staff_anywhere()`, and RLS
+enforces it a third time at the database. Middleware is a redirect convenience,
+not a gate.
+
+### D24. `/auth/callback` validates its `next` parameter
+
+Only same-origin relative paths are accepted, and `//host` (protocol-relative)
+is rejected. Without this the callback is an open redirect.
+
+### D25. Sign-out is a POST form, not a click handler
+
+A GET sign-out can be triggered by a link prefetch or an `<img>` tag. The form
+also works with JavaScript disabled.
+
+### D26. A signed-in non-staff user sees an explanation, not a redirect loop
+
+`/admin/login` distinguishes "not signed in" from "signed in but not staff" and
+offers sign-out in the second case.
