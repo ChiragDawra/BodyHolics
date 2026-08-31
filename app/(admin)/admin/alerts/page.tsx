@@ -1,13 +1,13 @@
 import { PageHeading } from "@/components/admin/PageHeading";
-import { MembersTable } from "@/components/admin/MembersTable";
+import { AlertsManager } from "@/components/admin/AlertsManager";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { getMembers, getStaffGym } from "@/lib/queries/admin";
+import { getAlerts, getStaffGym } from "@/lib/queries/admin";
 import { strings } from "@/lib/strings";
 
-export const metadata = { title: strings.admin.members.title };
+export const metadata = { title: strings.admin.alerts.title };
 export const dynamic = "force-dynamic";
 
-export default async function AdminMembersPage() {
+export default async function AdminAlertsPage() {
   const gym = await getStaffGym();
   if (!gym) {
     return (
@@ -18,12 +18,12 @@ export default async function AdminMembersPage() {
     );
   }
 
-  const members = await getMembers(gym.id);
+  const alerts = await getAlerts(gym.id);
 
   return (
     <>
-      <PageHeading title={strings.admin.members.title} />
-      <MembersTable members={members} />
+      <PageHeading title={strings.admin.alerts.title} />
+      <AlertsManager gymId={gym.id} alerts={alerts} />
     </>
   );
 }

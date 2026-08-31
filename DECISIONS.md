@@ -246,3 +246,52 @@ failure this app cannot have.
 optimizer, which on the Hobby plan is a metered resource spent on a 56px circle.
 The alternative — adding `lh3.googleusercontent.com` to `remotePatterns` — still
 pays that cost.
+
+---
+
+## Phase 5 — Admin dashboard
+
+### D31. `/admin/login` lives in a separate route group
+
+`app/(admin)/admin/layout.tsx` guards everything beneath it, and a layout
+cannot opt one of its own children out of that guard without a redirect loop.
+The login page therefore sits in `app/(admin-auth)/admin/login/`, which resolves
+to the same URL but inherits no guard.
+
+### D32. Every admin write is a server action that re-checks staff status
+
+Three layers guard admin writes: middleware (session exists), the server action
+(`is_staff_anywhere()`), and RLS at the database. The middle layer exists to
+turn a silent empty result into a message the user can read.
+
+### D33. Membership end dates are derived, never entered
+
+`startMembership` reads `duration_days` off the plan and computes the end date
+server-side. There is no date field in the UI, so the plan and the membership
+cannot disagree.
+
+### D34. Prices are entered in whole rupees and stored as paise
+
+The form takes rupees because that is what the owner says out loud; the action
+multiplies by 100 on the way in. The database never sees a decimal.
+
+### D35. Member search needs two characters before it lists anyone
+
+One letter against a few hundred members is a wall of names, and staff have a
+queue waiting. Results are also capped at 8.
+
+### D36. The first real Google sign-in becomes the gym owner
+
+Nobody can reach `/admin` until a row exists in `staff`, and nobody can create
+that row without already being staff. `handle_new_user` breaks the deadlock by
+granting `owner` to the first sign-in whose email is not a seeded
+`@demo.bodyholics` account. It never fires again once an owner exists.
+
+Without this the dashboard would be unreachable and the pitch would need a
+manual SQL step on the day.
+
+### D37. The seeded "today" check-ins were re-anchored to Asia/Kolkata
+
+They were originally written in UTC, so some fell on the wrong side of the
+gym-time day boundary and `/check` read 1 check-in instead of 6. Fixed in
+`20260901001100`.
