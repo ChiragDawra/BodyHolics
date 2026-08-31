@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { strings } from "@/lib/strings";
 import { cn } from "@/lib/cn";
 
 export type Tab = {
@@ -23,7 +24,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
 
   return (
     <nav
-      aria-label="Main"
+      aria-label={strings.common.mainNav}
       className={cn(
         "fixed inset-x-0 bottom-0 z-40",
         "border-t border-border bg-surface-raised",

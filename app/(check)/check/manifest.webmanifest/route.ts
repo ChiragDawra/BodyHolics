@@ -1,4 +1,5 @@
 import { strings } from "@/lib/strings";
+import { PWA_BACKGROUND } from "@/lib/theme";
 
 /**
  * Owner quick-check PWA manifest, served at /check/manifest.webmanifest.
@@ -19,8 +20,8 @@ export function GET() {
       scope: "/check",
       display: "standalone",
       orientation: "portrait",
-      background_color: "#141413",
-      theme_color: "#141413",
+      background_color: PWA_BACKGROUND,
+      theme_color: PWA_BACKGROUND,
       icons: [
         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
         { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

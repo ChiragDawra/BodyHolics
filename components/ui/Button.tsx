@@ -16,7 +16,7 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  // Touch targets stay at or above 44px on phones. sm is desktop-only.
+  // Touch targets clear the 44 point minimum on phones. sm is desktop-only.
   sm: "h-9 px-3 text-sm gap-1.5",
   md: "h-11 px-4 text-base gap-2",
   lg: "h-14 px-5 text-lg gap-2.5",

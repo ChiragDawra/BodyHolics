@@ -45,6 +45,10 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   const then = new Date(iso);
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
 
+  // A timestamp in the future is not "just now" — that reads as a lie next to
+  // a check-in that has not happened yet. Show the clock time instead.
+  if (seconds < 0) return formatClock(iso);
+
   if (seconds < 60) return "just now";
   if (seconds < 3600) {
     const m = Math.floor(seconds / 60);

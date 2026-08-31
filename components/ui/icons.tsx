@@ -216,6 +216,14 @@ export function CopyIcon({ className, strokeWidth = 2 }: IconProps) {
   );
 }
 
+/**
+ * The Google "G".
+ *
+ * The only place in the app with literal colours outside the token file, and
+ * deliberately so: Google's brand guidelines require these exact four values on
+ * a sign-in button. They are not our design tokens and must not follow our
+ * palette, in light mode or dark.
+ */
 export function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className}>

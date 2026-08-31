@@ -334,6 +334,8 @@ export const strings = {
 
   common: {
     loading: "Loading",
+    mainNav: "Main",
+    dashboardNav: "Dashboard",
     retry: "Try again",
     cancel: "Cancel",
     close: "Close",

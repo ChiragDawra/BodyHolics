@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { DM_Sans, Inter } from "next/font/google";
 import { strings } from "@/lib/strings";
+import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -43,8 +44,8 @@ export const viewport: Viewport = {
   // this the safe-area env() values are all zero.
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAFAF8" },
-    { media: "(prefers-color-scheme: dark)", color: "#141413" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR_LIGHT },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR_DARK },
   ],
 };
 

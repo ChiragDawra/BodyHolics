@@ -295,3 +295,75 @@ manual SQL step on the day.
 They were originally written in UTC, so some fell on the wrong side of the
 gym-time day boundary and `/check` read 1 check-in instead of 6. Fixed in
 `20260901001100`.
+
+---
+
+## Phase 6 — Owner quick-check
+
+Already built in Phase 2 (see D19). This phase was verification rather than
+construction. Confirmed live in a browser at 375px against the real database:
+
+- PIN pad rejects `9999` with a red shake and clears itself.
+- PIN `1234` unlocks: lock icon opens, green pulse ring fires, dashboard loads.
+- Today's count (6), active members (18), crowd level, open/closed, and the
+  last five members to check in all read from Supabase.
+- `/check` returns 200 with no session — the PIN and the RPCs are the gate.
+
+Screenshots in `design/screenshots/`.
+
+---
+
+## Phase 7 — Polish
+
+### D38. `middleware.ts` migrated to `proxy.ts`
+
+Next 16 deprecates the `middleware` file convention and warns on every dev
+boot. Renamed the file and the exported function; behaviour is unchanged.
+
+### D39. One documented JS mirror of the colour tokens: `lib/theme.ts`
+
+The audit for raw hex found six real leaks. `<meta name="theme-color">` and the
+two manifests' `background_color`/`theme_color` are read by the operating system
+before any CSS parses, so they cannot reference a custom property — they must be
+literals in JavaScript.
+
+Rather than leave six scattered hex values, they now come from `lib/theme.ts`,
+which exists solely to hold them and says in its own comment that it must stay
+in sync with `globals.css`. The coupling is real but it is now in one file
+instead of six.
+
+### D40. The Google "G" keeps its own colours
+
+`components/ui/icons.tsx` carries four literal hex values for the Google logo.
+Google's brand guidelines require those exact values on a sign-in button; they
+are not our design tokens and must not follow our palette in either theme. This
+is a documented exception, noted in the component.
+
+### D41. Four `aria-label`s were hardcoded and are now in `strings.ts`
+
+Screen readers read these aloud, which makes them user-facing copy like any
+other. `common.close`, `common.mainNav`, and `common.dashboardNav` were added.
+
+### D42. `formatRelative` no longer says "just now" about the future
+
+A timestamp ahead of the current time produced a negative interval, which fell
+through to "just now" and read as a lie next to a check-in that had not
+happened. Future timestamps now render as a clock time.
+
+Found by looking at the running app, not by a test — the demo check-ins were
+seeded at fixed morning hours and the app was being run after midnight.
+
+### D43. Demo check-ins are anchored to `now()`, not to a fixed hour
+
+Pinning them to 9am, 11am, and so on meant they sat in the future whenever the
+app ran earlier in the day. They now spread backwards from the current moment,
+which is correct whatever time the pitch happens.
+
+### Audit results
+
+- Raw hex outside `globals.css`: none, excluding the two documented exceptions
+  above.
+- Font names or pixel sizes outside `globals.css`: none.
+- Hardcoded user-facing strings in components: none.
+- Route protection verified live: `/app/*` → `/join`, `/admin/*` →
+  `/admin/login`, `/check` reachable with no session, `/sw.js` not intercepted.

@@ -30,7 +30,7 @@ export function AdminSidebar() {
 
   return (
     <nav
-      aria-label="Dashboard"
+      aria-label={strings.common.dashboardNav}
       className={cn(
         "border-border bg-surface-raised",
         "flex gap-1 overflow-x-auto border-b p-2",

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { CloseIcon } from "./icons";
+import { strings } from "@/lib/strings";
 import { cn } from "@/lib/cn";
 
 /**
@@ -48,7 +49,7 @@ export function Sheet({
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={strings.common.close}
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
@@ -72,7 +73,7 @@ export function Sheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={strings.common.close}
             className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:bg-surface-sunken"
           >
             <CloseIcon className="h-5 w-5" />
