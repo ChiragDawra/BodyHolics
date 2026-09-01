@@ -1,24 +1,26 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { Button } from "@/components/ui/Button";
-import { Card, CardBody } from "@/components/ui/Card";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { CheckIcon } from "@/components/ui/icons";
+import { homeFor } from "@/lib/config";
 import { strings } from "@/lib/strings";
 
-export const metadata = { title: strings.join.title };
+export const metadata = { title: strings.join.welcomeTitle };
+export const dynamic = "force-dynamic";
 
 /**
+ * Step 1 of 3.
+ *
  * The screen a member lands on after pointing their phone's own camera app at
  * the code on the gym wall. No camera API is used anywhere — the URL does the
- * work, and this page just validates the code in it.
+ * work and this page just validates the code in it.
  *
- * A missing `?g=` is treated as valid rather than an error: the owner will
- * hand out the bare /join link too, and a member who cannot get past a
- * "no code" screen is a member who does not join.
+ * A missing `?g=` is treated as valid: the owner will hand out the bare /join
+ * link too, and a member who cannot get past a "no code" screen is a member
+ * who does not join. A code that is present but wrong is still rejected.
  */
 export default async function JoinPage({
   searchParams,
@@ -27,8 +29,8 @@ export default async function JoinPage({
 }) {
   const { g: joinCode, error } = await searchParams;
 
-  // Already signed in? They have joined; send them to the app.
-  if (await getUser()) redirect("/app");
+  const user = await getUser();
+  if (user) redirect(homeFor(user.email));
 
   const supabase = await createClient();
   const { data: gym } = await supabase
@@ -57,45 +59,32 @@ export default async function JoinPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 px-5 py-12">
-      <div className="space-y-3">
-        <p className="font-display text-sm font-semibold text-brand">
-          {gym.name}
-        </p>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-ink text-balance">
-          {strings.join.title}
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-between px-7 pb-11 pt-[calc(4rem+env(safe-area-inset-top))]">
+      <p className="text-center font-display text-[0.9375rem] font-bold tracking-[0.14em] text-ink-dim">
+        {strings.join.brandmark}
+      </p>
+
+      <div className="text-center">
+        <h1 className="font-display text-4xl leading-[1.05] font-bold tracking-tighter text-balance text-ink">
+          {strings.join.welcomeTitle}
         </h1>
-        <p className="text-ink-muted">{strings.join.intro}</p>
+        <p className="mt-4 text-base leading-relaxed text-ink-muted">
+          {strings.join.welcomeLede}
+        </p>
       </div>
 
-      <Card>
-        <CardBody className="space-y-3 pt-4">
-          <h2 className="font-display font-semibold text-ink">
-            {strings.join.whatYouGet}
-          </h2>
-          <ul className="space-y-2.5">
-            {strings.join.benefits.map((benefit) => (
-              <li key={benefit} className="flex gap-2.5 text-sm text-ink">
-                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                {benefit}
-              </li>
-            ))}
-          </ul>
-        </CardBody>
-      </Card>
+      <div>
+        {error ? (
+          <p role="alert" className="mb-4 text-center text-sm text-danger">
+            {strings.join.signInFailedBody}
+          </p>
+        ) : null}
 
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {strings.join.signInFailedBody}
-        </p>
-      ) : null}
-
-      <div className="space-y-3">
         <GoogleSignInButton
           label={strings.join.signInWithGoogle}
-          next="/install"
+          next="/app/complete-profile"
         />
-        <p className="text-center text-xs text-ink-muted">
+        <p className="mt-4 text-center text-xs leading-relaxed text-ink-dim">
           {strings.join.footnote}
         </p>
       </div>

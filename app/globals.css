@@ -8,42 +8,50 @@
    bug — it means the design can no longer be changed in one place.
 
    Colours are named by role, never by hue: --color-brand, not --color-orange.
-   Swapping the palette is an edit to this block and nothing else.
+
+   This palette is dark-only. The design is dark-first on both sides of the
+   app — member and admin — and a light mode nobody designed would be a
+   second, worse product. `color-scheme: dark` tells the browser to render
+   form controls and scrollbars to match.
 --------------------------------------------------------------------------- */
 
 @theme {
-  /* Surfaces, back to front */
-  --color-surface: #FAFAF8;
-  --color-surface-raised: #FFFFFF;
-  --color-surface-sunken: #F0EFEB;
+  /* Surfaces, back to front. Base is the page; raised is a card; overlay is
+     a control or sheet sitting on top of a card. */
+  --color-surface: #0F0F0E;
+  --color-surface-raised: #1A1A18;
+  --color-surface-overlay: #242422;
+  --color-surface-high: #2E2E2B;
 
-  /* Text */
-  --color-ink: #1A1917;
-  --color-ink-muted: #6B6A63;
+  /* Text, brightest to faintest */
+  --color-ink: #F2F1ED;
+  --color-ink-muted: #A8A8A1;
+  --color-ink-dim: #7A7A74;
+  --color-ink-faint: #5E5E56;
 
-  /* Brand — the orange of rusted iron under gym lighting */
-  --color-brand: #E1502A;
-  --color-brand-hover: #C6431F;
-  --color-brand-subtle: #FFF0EB;
-  --color-on-brand: #FFFFFF;
+  /* Brand — the orange of rusted iron under gym lighting.
+     on-brand is near-black, not white: this orange is bright enough that
+     white text on it fails contrast. */
+  --color-brand: #E2683C;
+  --color-brand-hover: #F0844F;
+  --color-brand-subtle: #2A1610;
+  --color-on-brand: #141310;
 
   /* Lines */
-  --color-border: #E2E1DC;
-  --color-border-strong: #C9C7C0;
+  --color-border: #2E2E2B;
+  --color-border-soft: #242422;
+  --color-border-strong: #3A3A36;
 
   /* Status */
-  --color-success: #1E8E3E;
-  --color-success-subtle: #EDFBF0;
-  --color-warning: #B26B00;
-  --color-warning-subtle: #FFF8E5;
-  --color-danger: #D93025;
-  --color-danger-subtle: #FFF0EE;
+  --color-success: #3AAF57;
+  --color-warning: #D4940A;
+  --color-danger: #E05545;
 
   /* How busy the gym is. Semantic — these must survive a palette change. */
-  --color-crowd-low: #1E8E3E;
-  --color-crowd-mid: #E8A610;
-  --color-crowd-high: #E1502A;
-  --color-crowd-peak: #D93025;
+  --color-crowd-low: #3AAF57;
+  --color-crowd-mid: #D4940A;
+  --color-crowd-high: #E2683C;
+  --color-crowd-peak: #E05545;
 
   /* Type. Two faces, obviously different — a subtle contrast reads as an
      accident. DM Sans is the voice; Inter carries the reading. */
@@ -57,59 +65,25 @@
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
   --text-3xl: 2rem;
+  --text-4xl: 2.75rem;
+  --text-5xl: 3.25rem;
 
   --space-unit: 0.25rem;
   /* Tailwind derives its whole spacing scale from this. */
   --spacing: 0.25rem;
 
-  --radius-sm: 0.375rem;
+  --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
   --radius-full: 9999px;
-}
-
-/* Dark mode is one token block override, not a sweep through every component.
-   `@theme` above compiles to custom properties on `:root`, so redefining the
-   same names here is all that dark mode is. Nothing else in the app changes.
-
-   This is plain CSS on purpose — a nested `@theme` inside `@media` is not
-   valid Tailwind v4. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-surface: #141413;
-    --color-surface-raised: #1E1E1C;
-    --color-surface-sunken: #0A0A09;
-
-    --color-ink: #EAEAE6;
-    --color-ink-muted: #9C9C96;
-
-    --color-brand: #F06840;
-    --color-brand-hover: #FF7D55;
-    --color-brand-subtle: #2A1610;
-    --color-on-brand: #FFFFFF;
-
-    --color-border: #2E2E2B;
-    --color-border-strong: #444440;
-
-    --color-success: #3AAF57;
-    --color-success-subtle: #0F2016;
-    --color-warning: #E8A610;
-    --color-warning-subtle: #1F1800;
-    --color-danger: #F04438;
-    --color-danger-subtle: #200A08;
-
-    --color-crowd-low: #3AAF57;
-    --color-crowd-mid: #E8A610;
-    --color-crowd-high: #F06840;
-    --color-crowd-peak: #F04438;
-  }
 }
 
 /* ------------------------------------------------------------------------ */
 
 @layer base {
   html {
-    color-scheme: light dark;
+    color-scheme: dark;
     -webkit-text-size-adjust: 100%;
   }
 
@@ -122,7 +96,7 @@
 
   h1, h2, h3 {
     font-family: var(--font-display);
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 
   /* Focus is never invisible. Every interactive element gets this ring. */
@@ -132,9 +106,12 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Tap targets on phones should not flash a blue box. */
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  ::placeholder {
+    color: var(--color-ink-faint);
   }
 }
 
@@ -150,27 +127,27 @@
   }
 }
 
-@keyframes bh-shake {
-  10%, 90% { transform: translateX(-1px); }
-  20%, 80% { transform: translateX(2px); }
-  30%, 50%, 70% { transform: translateX(-4px); }
-  40%, 60% { transform: translateX(4px); }
-}
+/* --- Motion. Every keyframe used anywhere in the app lives here. --------- */
 
-@keyframes bh-pulse-ring {
-  0%   { transform: scale(0.9); opacity: 0.7; }
-  70%  { transform: scale(1.6); opacity: 0; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
+@keyframes bh-pulse   { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:.45; transform:scale(.82) } }
+@keyframes bh-halo    { 0% { transform:scale(.85); opacity:.5 } 70%,100% { transform:scale(2.1); opacity:0 } }
+@keyframes bh-seg     { from { opacity:0; transform:scaleY(.3) } to { opacity:1; transform:scaleY(1) } }
+@keyframes bh-bar     { from { transform:scaleX(0) } to { transform:scaleX(1) } }
+@keyframes bh-grow    { from { transform:scaleY(0) } to { transform:scaleY(1) } }
+@keyframes bh-rise    { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:translateY(0) } }
+@keyframes bh-slide   { from { opacity:0; transform:translateX(-18px) } to { opacity:1; transform:translateX(0) } }
+@keyframes bh-dot     { from { opacity:0; transform:scale(.2) } to { opacity:1; transform:scale(1) } }
+@keyframes bh-fade    { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+@keyframes bh-sheet   { from { transform:translateY(100%) } to { transform:translateY(0) } }
+@keyframes bh-scrim   { from { opacity:0 } to { opacity:1 } }
+@keyframes bh-draw    { from { stroke-dashoffset:1600 } to { stroke-dashoffset:0 } }
+@keyframes bh-flash   { 0% { background:rgba(58,175,87,.18) } 100% { background:transparent } }
+@keyframes bh-toast   { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+@keyframes bh-shake   { 10%,90% { transform:translateX(-1px) } 20%,80% { transform:translateX(2px) } 30%,50%,70% { transform:translateX(-4px) } 40%,60% { transform:translateX(4px) } }
+@keyframes bh-shimmer { 100% { transform:translateX(100%) } }
 
-@keyframes bh-shimmer {
-  100% { transform: translateX(100%); }
-}
-
-@keyframes bh-rise {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.bh-shake { animation: bh-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
-.bh-rise  { animation: bh-rise 0.18s ease-out both; }
+.bh-rise  { animation: bh-rise .42s cubic-bezier(.22,1,.36,1) both; }
+.bh-fade  { animation: bh-fade .2s ease-out both; }
+.bh-slide { animation: bh-slide .4s cubic-bezier(.22,1,.36,1) both; }
+.bh-shake { animation: bh-shake .4s cubic-bezier(.36,.07,.19,.97) both; }
+.bh-flash { animation: bh-flash 2.4s ease-out both; }

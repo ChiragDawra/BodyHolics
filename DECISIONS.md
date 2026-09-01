@@ -367,3 +367,160 @@ which is correct whatever time the pitch happens.
 - Hardcoded user-facing strings in components: none.
 - Route protection verified live: `/app/*` → `/join`, `/admin/*` →
   `/admin/login`, `/check` reachable with no session, `/sw.js` not intercepted.
+
+---
+
+## v2 — Reskin from Claude Design, admin rework
+
+Design source: `BodyHolics App v2.dc.html` (primary) and `BodyHolics Dark.dc.html`
+(member visual language) in Claude Design project `c2430910`. Read via the
+DesignSync MCP. `support.js` is the canvas runtime, not design content, and was
+ignored.
+
+### D44. The palette is now dark-only
+
+Every screen in both design files is dark, and the new tokens are dark values.
+Keeping a light mode nobody designed would mean shipping a second, worse
+product that no screenshot in the brief covers. `color-scheme: dark` is set so
+form controls and scrollbars follow.
+
+### D45. `--color-surface-sunken` renamed to `--color-surface-overlay`
+
+In the old light palette `#F0EFEB` sat *below* the card. In the new dark
+palette `#242422` sits *above* it — chips, sheets, and pressed states. Keeping
+the name "sunken" for the raised colour is exactly the kind of thing that rots,
+so it was renamed across the codebase. `--color-surface-high` (`#2E2E2B`) was
+added for borders and the alert sheet.
+
+### D46. "Best time today" reads the attendance histogram, not `crowd_reports`
+
+The instruction said to query a `crowd_reports` table for this weekday. That
+table does not exist, and the design doc is explicit that it should not:
+*"A view or RPC for weekday check-in histogram … No new table."* The check-in
+log already knows when the gym is busy, and a crowd-report table would have
+started empty and stayed empty because nothing writes to it.
+
+`quietest_hour(gym_id, weekday)` buckets `attendance.checked_in_at` by hour for
+that weekday over 120 days and returns the quietest. It returns null rather
+than guessing when fewer than three hours have two days of history.
+
+**Bug found by looking at the running app:** the first version bounded the
+search to a hardcoded 5–22 and recommended *"quiet after 10 pm"* — closing
+time. Technically true and useless. It now reads the gym's own `weekly_hours`
+for that weekday and excludes the final hour, so it suggests 3 pm rather than
+the moment the doors shut.
+
+### D47. Live occupancy needed `attendance.checked_out_at`
+
+"8 in the gym right now" is not derivable from check-ins alone. Added as a
+nullable column, with a partial index on open rows. Staff check people out from
+the attendance table; every historical visit was closed out in the demo seed so
+only today's can be open.
+
+### D48. `payments` is a real table, not a view over `plans`
+
+`plans.price_paise` cannot express collected vs. pending — a membership can
+exist without the money having arrived. Revenue, outstanding dues, and the
+member's own "nothing due" line all read from `payments`. Nothing charges
+anyone: this records cash the owner already takes at the desk.
+
+### D49. The staff code is verified by a function, never read by a browser
+
+`staff_codes` has no select policy for a plain member. `complete_profile()` and
+`staff_code_valid()` are SECURITY DEFINER: they compare and then grant or
+refuse. A member can *use* a code without being able to enumerate codes.
+Verified: anon select on `staff_codes` returns `[]`.
+
+The seeded code is `BHSTAFF2024`, as specified.
+
+### D50. Admin-by-email is routing, not authorisation
+
+`isAdminEmail()` in `lib/config.ts` decides where middleware *sends* someone
+after sign-in. It is not a permission check. The admin layout still calls
+`is_staff()` server-side and RLS still enforces staff membership at the
+database, so an email match with no staff row reaches /admin and sees nothing.
+This mirrors what the design doc says: *"the `staff` table and `is_staff()`
+already exist for the real thing, so RLS does not change."*
+
+### D51. `/app/complete-profile` is exempt from the admin redirect
+
+Middleware sends the admin email to /admin from anywhere under /app — except
+the profile form. The owner has to give the desk a phone number like everyone
+else, and bouncing them off the form would leave `profiles.phone` null forever.
+
+### D52. Walk-in members get a sign-in-incapable `auth.users` row
+
+`profiles.id` references `auth.users`, so "add member manually" cannot just
+insert a profile. `add_walk_in_member()` creates an auth row with no password
+and no identity — the same shape as the demo seed — so the account exists as a
+record the desk can check in and bill, but cannot be signed in to. Gated on
+`is_staff()` inside the function, since inserting into `auth.users` is
+privileged. If that person later signs in with Google they get a separate
+profile; merging the two is a real feature and deliberately not attempted.
+
+### D53. The member detail route became a panel
+
+v2 shows member detail as a side panel next to the table (desktop) and a bottom
+sheet (phone), so `/admin/members/[id]` was deleted. Detail is fetched per
+member on selection rather than for all of them up front — 84 members ×
+membership history × 30 days of attendance is a lot of rows to ship for the one
+row someone clicks.
+
+### D54. Plans moved into Gym settings
+
+The v2 sidebar has six items and Plans is not one of them; the design puts plan
+CRUD in a card on the settings page. `/admin/plans` was removed.
+
+### D55. The admin phone layout is three tabs, not a squeezed sidebar
+
+Below 640px the sidebar is replaced by Dashboard / Members / More. The owner on
+a phone is checking a number or flipping the gym open; revenue tables and plan
+editing live behind More and are laid out for a laptop. Each More row carries a
+live summary so the answer is often visible without opening the page.
+
+### D56. Quick alert on the phone is title-only
+
+One field, no body. Someone standing at the desk with one hand free is sending
+"Closing early today", not composing. The full composer with a body is on the
+Alerts page.
+
+### D57. "Pay dues" is present and visibly off
+
+Payments are out of scope, but omitting the control makes the screen look
+unfinished. It renders greyed with `cursor-not-allowed` and toasts the honest
+reason on tap, which shows the owner where the feature will live without
+pretending it exists. Same treatment on "Record payment" in the admin panel.
+
+### D58. `lib/theme.ts` updated, still the only JS colour mirror
+
+The manifest and `<meta name="theme-color">` are read by the OS before CSS
+parses, so they must be literals. Both now point at the new base `#0F0F0E`.
+
+### Audits
+
+- Raw hex outside `globals.css`: none, except the two documented exceptions
+  (`lib/theme.ts`, the Google "G").
+- Font names or pixel sizes outside `globals.css`: none. One real leak found
+  and fixed — `h-[150px]` on the revenue chart became `h-37.5`, which is
+  `37.5 × --spacing`.
+- Hardcoded user-facing strings, `aria-label`s, and placeholders: none.
+- `/check` references anywhere in source: none. Route returns 404.
+
+### Verified live in a browser
+
+- Landing, `/join`, `/join/done`, `/install`, `/admin/login` all render on the
+  new palette.
+- Member home renders as a bento grid: hero, crowd + live count pair,
+  membership, best time, streak, frosted tab bar.
+- Crowd segments confirmed rendering via computed style (green
+  `rgb(58,175,87)`, 6px, opacity 1) after they looked absent in a scaled
+  screenshot.
+- `/app` → `/join` and `/admin` → `/admin/login` when signed out; `/check` 404.
+
+### Not verified
+
+The admin dashboard and the member screens for a member *with* a membership
+have not been seen rendered. Both need a signed-in session — the admin needs
+`chiragdawra46@gmail.com` specifically — and Google sign-in cannot be completed
+from here. The queries, actions, and RLS are verified at the database layer;
+the rendered pages are not.

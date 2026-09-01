@@ -3,7 +3,7 @@
    network-first for pages so a member never sees a stale open/closed state. */
 
 const VERSION = "bh-v1";
-const SHELL = ["/app", "/check", "/offline"];
+const SHELL = ["/app", "/offline"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

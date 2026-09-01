@@ -1,7 +1,7 @@
 import { PageHeading } from "@/components/admin/PageHeading";
 import { AlertsManager } from "@/components/admin/AlertsManager";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { getAlerts, getStaffGym } from "@/lib/queries/admin";
+import { getAlerts, getMembers, getStaffGym } from "@/lib/queries/admin";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.admin.alerts.title };
@@ -18,12 +18,15 @@ export default async function AdminAlertsPage() {
     );
   }
 
-  const alerts = await getAlerts(gym.id);
+  const [alerts, members] = await Promise.all([
+    getAlerts(gym.id),
+    getMembers(gym.id),
+  ]);
 
   return (
     <>
-      <PageHeading title={strings.admin.alerts.title} />
-      <AlertsManager gymId={gym.id} alerts={alerts} />
+      <PageHeading title={strings.admin.alerts.title} subtitle={strings.admin.alerts.lede} />
+      <AlertsManager gymId={gym.id} alerts={alerts} memberCount={members.length} />
     </>
   );
 }

@@ -5,8 +5,10 @@ import { Sheet } from "@/components/ui/Sheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { BellIcon, MegaphoneIcon } from "@/components/ui/icons";
 import { createClient } from "@/lib/supabase/client";
+import { markAlertsRead } from "@/lib/actions/profile";
 import { formatRelative } from "@/lib/format";
 import { strings } from "@/lib/strings";
+import { cn } from "@/lib/cn";
 
 export type AlertItem = {
   id: string;
@@ -16,13 +18,13 @@ export type AlertItem = {
 };
 
 /**
- * Bell in the member header. Shows an unread count, opens the alert list in a
- * Sheet, and subscribes to Realtime so a notice published from the desk lands
- * on a member's phone without a refresh.
+ * Bell in the member header. A dot rather than a count — the design uses
+ * presence, not arithmetic, because "3" invites you to count and "unread"
+ * only needs to say yes or no.
  *
- * Unread is tracked in the alert_reads table, not localStorage — Supabase is
- * the source of truth, so the badge is the same on every device the member
- * signs in on.
+ * Subscribes to Realtime so a notice published from the desk lands on a
+ * member's phone without a refresh. Read state lives in alert_reads, not
+ * localStorage, so it is the same on every device the member signs in on.
  */
 export function AlertsBell({
   gymId,
@@ -65,31 +67,15 @@ export function AlertsBell({
     };
   }, [gymId]);
 
-  const markAllRead = useCallback(async () => {
+  const openSheet = useCallback(() => {
+    setOpen(true);
     if (unread.size === 0) return;
-
     const ids = [...unread];
     setUnread(new Set());
-
-    const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
-    if (!userId) return;
-
-    await supabase
-      .from("alert_reads")
-      .upsert(
-        ids.map((alert_id) => ({ alert_id, profile_id: userId })),
-        { onConflict: "alert_id,profile_id" },
-      );
+    void markAlertsRead(ids);
   }, [unread]);
 
-  const openSheet = () => {
-    setOpen(true);
-    void markAllRead();
-  };
-
-  const count = unread.size;
+  const hasUnread = unread.size > 0;
 
   return (
     <>
@@ -97,28 +83,22 @@ export function AlertsBell({
         type="button"
         onClick={openSheet}
         aria-label={
-          count > 0
-            ? `${strings.member.openAlerts}, ${strings.member.alertsUnread(count)}`
+          hasUnread
+            ? `${strings.member.openAlerts}, ${strings.member.unreadCount(unread.size)}`
             : strings.member.openAlerts
         }
-        className="relative flex h-11 w-11 items-center justify-center rounded-full text-ink hover:bg-surface-sunken"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-raised"
       >
-        <BellIcon className="h-6 w-6" />
-        {count > 0 ? (
+        <BellIcon className="h-5.5 w-5.5" strokeWidth={1.8} />
+        {hasUnread ? (
           <span
             aria-hidden
-            className="absolute right-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 font-display text-xs font-bold text-on-brand"
-          >
-            {count > 9 ? "9+" : count}
-          </span>
+            className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand ring-2 ring-surface"
+          />
         ) : null}
       </button>
 
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title={strings.member.alertsTitle}
-      >
+      <Sheet open={open} onClose={() => setOpen(false)} title={strings.member.alertsTitle}>
         {alerts.length === 0 ? (
           <EmptyState
             icon={<MegaphoneIcon className="h-6 w-6" />}
@@ -126,18 +106,42 @@ export function AlertsBell({
             body={strings.member.alertsEmptyBody}
           />
         ) : (
-          <ul className="divide-y divide-border">
-            {alerts.map((alert) => (
-              <li key={alert.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="font-display font-semibold text-ink">{alert.title}</p>
-                {alert.body ? (
-                  <p className="mt-1 text-sm text-ink-muted">{alert.body}</p>
-                ) : null}
-                <p className="mt-1.5 text-xs text-ink-muted">
-                  {formatRelative(alert.created_at)}
-                </p>
-              </li>
-            ))}
+          <ul className="flex flex-col gap-2.5">
+            {alerts.map((alert, i) => {
+              // The newest alert carries the accent edge; older ones fade back.
+              const lead = i === 0;
+              return (
+                <li
+                  key={alert.id}
+                  className={cn(
+                    "rounded-r-md bg-surface-overlay px-4 py-3.5 border-l-4",
+                    lead ? "border-l-brand" : "border-l-border",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "font-display font-bold",
+                      lead ? "text-ink" : "text-ink-muted",
+                    )}
+                  >
+                    {alert.title}
+                  </p>
+                  {alert.body ? (
+                    <p
+                      className={cn(
+                        "mt-1.5 text-sm leading-relaxed",
+                        lead ? "text-ink-muted" : "text-ink-dim",
+                      )}
+                    >
+                      {alert.body}
+                    </p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-ink-dim">
+                    {formatRelative(alert.created_at)}
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Sheet>

@@ -2,15 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Card, CardBody } from "@/components/ui/Card";
+import { Card, CardLabel } from "@/components/ui/Card";
+import { HeroStatus } from "@/components/member/HeroStatus";
+import { CrowdMeter } from "@/components/member/CrowdMeter";
 import {
   DAY_LABELS,
   parseWeeklyHours,
   resolveOpenState,
   formatTime,
-  CROWD_BG,
 } from "@/lib/gym";
+import { homeFor } from "@/lib/config";
 import { strings } from "@/lib/strings";
 
 // Opening hours and crowd change through the day, so this cannot be static.
@@ -36,101 +37,67 @@ export default async function LandingPage() {
 
   return (
     <main className="mx-auto w-full max-w-md px-5 pb-16 pt-[calc(3rem+env(safe-area-inset-top))]">
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className={`h-2.5 w-2.5 rounded-full ${
-              openState.isOpen ? "bg-success" : "bg-danger"
-            }`}
-          />
-          <span
-            className={`font-display text-sm font-semibold ${
-              openState.isOpen ? "text-success" : "text-danger"
-            }`}
-          >
-            {openState.isOpen
-              ? strings.member.gymOpen
-              : strings.member.gymClosed}
-          </span>
-        </div>
-
+      <div className="space-y-3">
         <h1 className="font-display text-3xl font-bold tracking-tight text-ink">
           {gym?.name ?? strings.landing.title}
         </h1>
-        <p className="text-lg text-ink text-balance">{strings.landing.tagline}</p>
+        <p className="text-lg text-balance text-ink">{strings.landing.tagline}</p>
         <p className="text-ink-muted">{strings.landing.lede}</p>
       </div>
 
-      <div className="mt-8 space-y-3">
-        {user ? (
-          <Link href="/app" className="block">
-            <Button size="lg" fullWidth>
-              {strings.landing.openMemberApp}
-            </Button>
-          </Link>
-        ) : (
-          <Link
-            href={gym ? `/join?g=${gym.join_code}` : "/join"}
-            className="block"
-          >
-            <Button size="lg" fullWidth>
-              {strings.landing.joinCta}
-            </Button>
-          </Link>
-        )}
+      <div className="mt-7">
+        <HeroStatus state={openState} />
       </div>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="font-display text-lg font-semibold text-ink">
-          {strings.member.crowdHeading}
-        </h2>
-        <Card>
-          <CardBody className="flex items-center gap-3 pt-4">
-            <span
-              aria-hidden
-              className={`h-3 w-3 shrink-0 rounded-full ${CROWD_BG[crowd]}`}
-            />
-            <div>
-              <p className="font-display font-semibold text-ink">
-                {strings.member.crowd[crowd]}
-              </p>
-              <p className="text-sm text-ink-muted">
-                {strings.member.crowdCaption[crowd]}
-              </p>
-            </div>
-          </CardBody>
+      <div className="mt-2.5">
+        <Card className="p-4">
+          <CrowdMeter level={crowd} />
         </Card>
-      </section>
+      </div>
 
-      <section className="mt-8 space-y-3">
-        <h2 className="font-display text-lg font-semibold text-ink">
-          {strings.landing.hoursHeading}
-        </h2>
-        <Card>
-          <CardBody className="divide-y divide-border pt-0">
-            <HoursRow
-              label={strings.landing.weekdays}
-              hours={weekday ? `${formatTime(weekday.open)} to ${formatTime(weekday.close)}` : strings.landing.closed}
-            />
-            <HoursRow
-              label={strings.landing.weekends}
-              hours={weekend ? `${formatTime(weekend.open)} to ${formatTime(weekend.close)}` : strings.landing.closed}
-            />
-          </CardBody>
+      <div className="mt-6">
+        <Link
+          href={user ? homeFor(user.email) : gym ? `/join?g=${gym.join_code}` : "/join"}
+          className="block"
+        >
+          <Button size="lg" fullWidth>
+            {user ? strings.landing.openMemberApp : strings.landing.joinCta}
+          </Button>
+        </Link>
+      </div>
+
+      <section className="mt-9">
+        <CardLabel>{strings.landing.hoursHeading}</CardLabel>
+        <Card className="mt-2.5 px-5 py-1">
+          <HoursRow
+            label={strings.landing.weekdays}
+            hours={
+              weekday
+                ? `${formatTime(weekday.open)} to ${formatTime(weekday.close)}`
+                : strings.landing.closed
+            }
+          />
+          <HoursRow
+            label={strings.landing.weekends}
+            hours={
+              weekend
+                ? `${formatTime(weekend.open)} to ${formatTime(weekend.close)}`
+                : strings.landing.closed
+            }
+          />
         </Card>
-        {openState.overridden ? (
-          <Badge tone={openState.isOpen ? "success" : "danger"}>
-            {openState.isOpen
-              ? strings.member.gymOpen
-              : strings.member.gymClosed}
-          </Badge>
-        ) : null}
+
+        {/* The two-row summary is a simplification; screen readers get the
+            actual seven days rather than an approximation of them. */}
         <p className="sr-only">
           {Object.entries(DAY_LABELS)
             .map(([key, label]) => {
               const day = hours[key as keyof typeof hours];
-              return `${label}: ${day ? `${formatTime(day.open)} to ${formatTime(day.close)}` : strings.landing.closed}`;
+              return `${label}: ${
+                day
+                  ? `${formatTime(day.open)} to ${formatTime(day.close)}`
+                  : strings.landing.closed
+              }`;
             })
             .join(". ")}
         </p>
@@ -141,8 +108,8 @@ export default async function LandingPage() {
 
 function HoursRow({ label, hours }: { label: string; hours: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <span className="text-ink">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-border-soft py-3.5 last:border-0">
+      <span className="text-ink-muted">{label}</span>
       <span className="font-display font-semibold text-ink">{hours}</span>
     </div>
   );

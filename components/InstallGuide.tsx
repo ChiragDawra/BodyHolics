@@ -72,14 +72,14 @@ export function InstallGuide() {
             <ol className="space-y-3">
               {strings.install.iosSteps.map((step, i) => (
                 <li key={step} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-sunken font-display text-sm font-semibold text-ink">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-overlay font-display text-sm font-semibold text-ink">
                     {i + 1}
                   </span>
                   <span className="pt-0.5 text-sm text-ink">{step}</span>
                 </li>
               ))}
             </ol>
-            <div className="flex items-center justify-center gap-6 rounded-md bg-surface-sunken py-4 text-ink-muted">
+            <div className="flex items-center justify-center gap-6 rounded-md bg-surface-overlay py-4 text-ink-muted">
               <ShareIcon className="h-7 w-7" />
               <span aria-hidden className="text-ink-muted">
                 then

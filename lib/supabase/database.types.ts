@@ -85,6 +85,7 @@ export type Database = {
       attendance: {
         Row: {
           checked_in_at: string
+          checked_out_at: string | null
           created_at: string
           gym_id: string
           id: string
@@ -94,6 +95,7 @@ export type Database = {
         }
         Insert: {
           checked_in_at?: string
+          checked_out_at?: string | null
           created_at?: string
           gym_id: string
           id?: string
@@ -103,6 +105,7 @@ export type Database = {
         }
         Update: {
           checked_in_at?: string
+          checked_out_at?: string | null
           created_at?: string
           gym_id?: string
           id?: string
@@ -244,6 +247,80 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_paise: number
+          created_at: string
+          gym_id: string
+          id: string
+          membership_id: string | null
+          method: Database["public"]["Enums"]["payment_method"]
+          note: string | null
+          paid_at: string
+          plan_id: string | null
+          profile_id: string
+          recorded_by: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+        }
+        Insert: {
+          amount_paise: number
+          created_at?: string
+          gym_id: string
+          id?: string
+          membership_id?: string | null
+          method?: Database["public"]["Enums"]["payment_method"]
+          note?: string | null
+          paid_at?: string
+          plan_id?: string | null
+          profile_id: string
+          recorded_by?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+        }
+        Update: {
+          amount_paise?: number
+          created_at?: string
+          gym_id?: string
+          id?: string
+          membership_id?: string | null
+          method?: Database["public"]["Enums"]["payment_method"]
+          note?: string | null
+          paid_at?: string
+          plan_id?: string | null
+          profile_id?: string
+          recorded_by?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           created_at: string
@@ -287,6 +364,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string | null
+          emergency_contact: string | null
           full_name: string | null
           gym_id: string
           id: string
@@ -296,6 +374,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          emergency_contact?: string | null
           full_name?: string | null
           gym_id: string
           id: string
@@ -305,6 +384,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          emergency_contact?: string | null
           full_name?: string | null
           gym_id?: string
           id?: string
@@ -352,11 +432,55 @@ export type Database = {
           },
         ]
       }
+      staff_codes: {
+        Row: {
+          code: string
+          created_at: string
+          gym_id: string
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["staff_role"]
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          gym_id: string
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["staff_role"]
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          gym_id?: string
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["staff_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_codes_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      add_walk_in_member: {
+        Args: {
+          p_email: string
+          p_full_name: string
+          p_gym_id: string
+          p_phone: string
+        }
+        Returns: string
+      }
       check_assert_pin: {
         Args: { p_gym_slug: string; p_pin: string }
         Returns: string
@@ -390,17 +514,33 @@ export type Database = {
         Args: { p_gym_slug: string; p_open: boolean; p_pin: string }
         Returns: Json
       }
+      complete_profile: {
+        Args: {
+          p_emergency_contact: string
+          p_full_name: string
+          p_phone: string
+          p_staff_code: string
+        }
+        Returns: Json
+      }
       is_staff: { Args: { p_gym_id: string }; Returns: boolean }
       is_staff_anywhere: { Args: never; Returns: boolean }
       membership_is_current: {
         Args: { m: Database["public"]["Tables"]["memberships"]["Row"] }
         Returns: boolean
       }
+      quietest_hour: {
+        Args: { p_gym_id: string; p_weekday: number }
+        Returns: Json
+      }
+      staff_code_valid: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       attendance_method: "manual" | "qr"
       crowd_level: "not_crowded" | "moderate" | "crowded" | "very_crowded"
       membership_status: "active" | "expired" | "cancelled"
+      payment_method: "cash" | "upi" | "card" | "other"
+      payment_status: "collected" | "pending" | "refunded"
       staff_role: "owner" | "staff"
     }
     CompositeTypes: {
@@ -532,6 +672,8 @@ export const Constants = {
       attendance_method: ["manual", "qr"],
       crowd_level: ["not_crowded", "moderate", "crowded", "very_crowded"],
       membership_status: ["active", "expired", "cancelled"],
+      payment_method: ["cash", "upi", "card", "other"],
+      payment_status: ["collected", "pending", "refunded"],
       staff_role: ["owner", "staff"],
     },
   },

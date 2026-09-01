@@ -24,6 +24,7 @@ export const CROWD_BG: Record<CrowdLevel, string> = {
   very_crowded: "bg-crowd-peak",
 };
 
+/** How many of the four segments are lit. */
 export const CROWD_FILL: Record<CrowdLevel, number> = {
   not_crowded: 1,
   moderate: 2,
@@ -52,6 +53,9 @@ export const DAY_LABELS: Record<DayKey, string> = {
   sat: "Saturday",
   sun: "Sunday",
 };
+
+/** Two-letter column headings on the activity grid. */
+export const DAY_INITIALS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const;
 
 export type DayHours = { open: string; close: string } | null;
 export type WeeklyHours = Partial<Record<DayKey, DayHours>>;
@@ -82,6 +86,17 @@ function gymParts(now: Date) {
   return { weekday, minutes };
 }
 
+/** ISO weekday in the gym's timezone: Monday = 1 … Sunday = 7. */
+export function gymIsoWeekday(now: Date = new Date()): number {
+  const index = DAY_KEYS.indexOf(gymParts(now).weekday);
+  return index === -1 ? 1 : index + 1;
+}
+
+export function gymWeekdayLabel(now: Date = new Date()): string {
+  const key = gymParts(now).weekday;
+  return DAY_LABELS[key] ?? DAY_LABELS.mon;
+}
+
 function toMinutes(hhmm: string): number | null {
   const [h, m] = hhmm.split(":");
   if (h === undefined || m === undefined) return null;
@@ -104,6 +119,13 @@ export function formatTime(hhmm: string): string {
   return mins === 0
     ? `${display} ${suffix}`
     : `${display}:${String(mins).padStart(2, "0")} ${suffix}`;
+}
+
+/** A bare hour number as the gym would say it: 20 -> "8 pm". */
+export function formatHour(hour: number): string {
+  const suffix = hour >= 12 ? "pm" : "am";
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${display} ${suffix}`;
 }
 
 export type OpenState = {
@@ -179,4 +201,13 @@ export function parseWeeklyHours(value: unknown): WeeklyHours {
   }
 
   return out;
+}
+
+/** "9876543210" -> "+91 98765 43210". Leaves anything unexpected alone. */
+export function formatPhone(raw: string | null): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  const local = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+  if (local.length !== 10) return raw;
+  return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
 }

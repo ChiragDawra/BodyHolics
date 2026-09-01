@@ -74,7 +74,7 @@ export function Sheet({
             type="button"
             onClick={onClose}
             aria-label={strings.common.close}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:bg-surface-sunken"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:bg-surface-overlay"
           >
             <CloseIcon className="h-5 w-5" />
           </button>

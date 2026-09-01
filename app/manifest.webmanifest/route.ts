@@ -4,10 +4,10 @@ import { PWA_BACKGROUND } from "@/lib/theme";
 /**
  * Member PWA manifest, served at /manifest.webmanifest.
  *
- * This is a route handler rather than the `app/manifest.ts` file convention
- * because the owner's /check app needs a second, different manifest. The file
+ * A route handler rather than the `app/manifest.ts` file convention: that
  * convention injects one <link rel="manifest"> into every page in the app,
- * which would fight with the check one. Each route group links its own.
+ * including the public landing page and the admin dashboard, neither of which
+ * is installable. The member route group links this one itself.
  */
 export const dynamic = "force-static";
 

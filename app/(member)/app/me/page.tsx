@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import { MemberHeader } from "@/components/member/MemberHeader";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { MemberTabBar } from "@/components/member/MemberTabBar";
+import { PayDuesButton } from "@/components/member/PayDuesButton";
+import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TagIcon, AddSquareIcon } from "@/components/ui/icons";
 import { getMemberSnapshot } from "@/lib/queries/member";
-import { formatFullDate, daysUntil } from "@/lib/format";
+import { formatFullDate, formatDay, daysUntil } from "@/lib/format";
+import { formatPhone } from "@/lib/gym";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.member.meTitle };
@@ -18,54 +20,94 @@ export const dynamic = "force-dynamic";
 export default async function MemberMePage() {
   const snapshot = await getMemberSnapshot();
   if (!snapshot) redirect("/join");
+  if (!snapshot.profile.phone) redirect("/app/complete-profile");
 
-  const { profile, membership } = snapshot;
+  const { profile, membership, duesPaise } = snapshot;
+  const left = membership ? daysUntil(membership.end_date) : 0;
   const active =
-    membership !== null &&
-    membership.status === "active" &&
-    daysUntil(membership.end_date) >= 0;
+    membership !== null && membership.status === "active" && left >= 0;
+
+  const spanDays = membership
+    ? Math.max(
+        1,
+        Math.round(
+          (new Date(membership.end_date).getTime() -
+            new Date(membership.start_date).getTime()) /
+            86_400_000,
+        ),
+      )
+    : 1;
+  const elapsedPct = membership
+    ? Math.min(100, Math.max(0, Math.round(((spanDays - left) / spanDays) * 100)))
+    : 0;
+
+  const initial = (profile.full_name ?? profile.email ?? "?")
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <>
       <MemberHeader title={strings.member.meTitle} />
 
-      <div className="space-y-4 px-4 pb-6">
-        <Card>
-          <CardBody className="flex items-center gap-4 pt-4">
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt=""
-                width={56}
-                height={56}
-                className="h-14 w-14 rounded-full object-cover"
-                unoptimized
-              />
-            ) : (
-              <div
-                aria-hidden
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-subtle font-display text-xl font-bold text-brand"
-              >
-                {(profile.full_name ?? "?").charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate font-display text-lg font-semibold text-ink">
-                {profile.full_name ?? ""}
-              </p>
-              <p className="truncate text-sm text-ink-muted">
-                {profile.email ?? ""}
-              </p>
-            </div>
-          </CardBody>
-        </Card>
+      <div className="flex flex-col gap-2.5 px-4 pb-32">
+        <div className="flex items-center gap-3.5 px-1 pb-4 pt-1.5">
+          <span
+            aria-hidden
+            className="flex h-13 w-13 flex-none items-center justify-center rounded-full border border-border bg-surface-overlay font-display text-xl font-bold text-ink-muted"
+          >
+            {initial}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-display text-xl font-bold tracking-tight text-ink">
+              {profile.full_name ?? ""}
+            </p>
+            <p className="truncate text-sm text-ink-dim">
+              {[profile.email, formatPhone(profile.phone)]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader title={strings.member.membershipDetailsHeading} />
-          <CardBody>
-            {membership ? (
-              <dl className="divide-y divide-border">
-                <Row label={strings.member.plan} value={membership.plan_name ?? ""} />
+        <Card className="px-4.5 py-5">
+          {membership ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-display text-lg font-bold tracking-tight text-ink">
+                  {membership.plan_name ?? ""}
+                </span>
+                <Badge tone={active ? "success" : "danger"}>
+                  {active
+                    ? strings.member.membershipActive
+                    : membership.status === "cancelled"
+                      ? strings.member.membershipCancelled
+                      : strings.member.membershipExpired}
+                </Badge>
+              </div>
+
+              <div className="mt-4 flex items-baseline gap-2.5">
+                <span className="font-display text-5xl leading-none font-bold tracking-tighter text-brand">
+                  {left}
+                </span>
+                <span className="text-base text-ink-muted">
+                  {strings.member.daysLeft}
+                </span>
+              </div>
+
+              <div className="mt-4.5 mb-4.5 h-[0.1875rem] overflow-hidden rounded-full bg-surface-overlay">
+                <div
+                  className="h-full origin-left rounded-full bg-brand animate-[bh-bar_0.9s_cubic-bezier(0.22,1,0.36,1)_both]"
+                  style={{ width: `${elapsedPct}%` }}
+                />
+              </div>
+
+              <dl>
+                {membership.plan_price_paise !== null ? (
+                  <Row
+                    label={strings.member.price}
+                    value={strings.common.rupees(membership.plan_price_paise)}
+                  />
+                ) : null}
                 <Row
                   label={strings.member.started}
                   value={formatFullDate(membership.start_date)}
@@ -74,47 +116,59 @@ export default async function MemberMePage() {
                   label={strings.member.ends}
                   value={formatFullDate(membership.end_date)}
                 />
-                <div className="flex items-center justify-between gap-4 py-3">
-                  <dt className="text-ink-muted">{strings.member.status}</dt>
-                  <dd>
-                    <Badge tone={active ? "success" : "danger"}>
-                      {active
-                        ? strings.member.membershipActive
-                        : membership.status === "cancelled"
-                          ? strings.member.membershipCancelled
-                          : strings.member.membershipExpired}
-                    </Badge>
-                  </dd>
-                </div>
               </dl>
-            ) : (
-              <EmptyState
-                icon={<TagIcon className="h-6 w-6" />}
-                title={strings.member.noMembership}
-                body={strings.member.noMembershipBody}
-              />
-            )}
-          </CardBody>
+            </>
+          ) : (
+            <EmptyState
+              icon={<TagIcon className="h-6 w-6" />}
+              title={strings.member.noMembership}
+              body={strings.member.noMembershipBody}
+            />
+          )}
+        </Card>
+
+        {/* Payments are explicitly out of scope for this build. The control is
+            shown but visibly off, so the owner can see where it will live. */}
+        <Card className="p-4.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardLabel>{strings.member.payment}</CardLabel>
+              <p className="mt-1.5 text-sm font-medium text-ink-muted">
+                {duesPaise > 0
+                  ? strings.member.duesOwed(strings.common.rupees(duesPaise))
+                  : strings.member.nothingDue}
+              </p>
+            </div>
+            <PayDuesButton />
+          </div>
+          <p className="mt-3 text-xs text-ink-faint">{strings.member.comingSoon}</p>
         </Card>
 
         <Link href="/install" className="block">
-          <Button variant="secondary" fullWidth>
-            <AddSquareIcon className="h-5 w-5" />
-            {strings.member.installApp}
+          <Button variant="secondary" fullWidth size="lg">
+            <AddSquareIcon className="h-4.5 w-4.5" />
+            {strings.join.addToHome}
           </Button>
         </Link>
 
-        <SignOutButton label={strings.member.signOut} />
+        <div className="flex items-center justify-between gap-3 px-1.5 pt-4">
+          <span className="text-xs text-ink-dim">
+            {strings.member.memberSince(formatDay(profile.created_at))}
+          </span>
+          <SignOutButton label={strings.member.signOut} variant="link" />
+        </div>
       </div>
+
+      <MemberTabBar />
     </>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className="font-display font-semibold text-ink">{value}</dd>
+    <div className="flex items-center justify-between gap-4 border-t border-border-soft py-2.5">
+      <dt className="text-sm text-ink-dim">{label}</dt>
+      <dd className="text-sm font-medium text-ink">{value}</dd>
     </div>
   );
 }

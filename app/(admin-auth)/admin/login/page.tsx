@@ -20,7 +20,7 @@ export default async function AdminLoginPage() {
   if (user && (await isStaff())) redirect("/admin");
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-surface-sunken px-5">
+    <main className="flex min-h-dvh items-center justify-center bg-surface-overlay px-5">
       <Card className="w-full max-w-sm">
         <CardBody className="space-y-5 pt-6">
           <div className="space-y-2">

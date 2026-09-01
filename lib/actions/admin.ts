@@ -61,6 +61,63 @@ export async function checkInMember(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Marks someone as having left. Drives the "in the gym now" count down. */
+export async function checkOutMember(attendanceId: unknown): Promise<ActionResult> {
+  const parsed = z.string().uuid().safeParse(attendanceId);
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("attendance")
+    .update({ checked_out_at: new Date().toISOString() })
+    .eq("id", parsed.data)
+    .is("checked_out_at", null);
+
+  if (error) return FAILED;
+
+  revalidatePath("/admin/attendance");
+  revalidatePath("/admin");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+/**
+ * Adds someone who joined at the desk and has no phone to scan the code with.
+ *
+ * These profiles have no auth.users row, so they cannot sign in — they exist
+ * as records the desk can check in and bill. If they later sign in with
+ * Google, that creates a separate profile; merging the two is a real feature
+ * and deliberately not attempted here.
+ */
+export async function addMemberManually(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      gymId: z.string().uuid(),
+      fullName: z.string().trim().min(1).max(80),
+      phone: z.string().transform((v) => v.replace(/\D/g, "")),
+      email: z.string().trim().email().optional().or(z.literal("")),
+    })
+    .safeParse(input);
+
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("add_walk_in_member", {
+    p_gym_id: parsed.data.gymId,
+    p_full_name: parsed.data.fullName,
+    p_phone: parsed.data.phone,
+    // The SQL collapses "" to null via nullif, so there is no null to pass.
+    p_email: parsed.data.email ?? "",
+  });
+
+  if (error) return FAILED;
+
+  revalidatePath("/admin/members");
+  return { ok: true };
+}
+
 export async function undoCheckIn(attendanceId: unknown): Promise<ActionResult> {
   const parsed = z.string().uuid().safeParse(attendanceId);
   if (!parsed.success) return FAILED;
@@ -226,6 +283,7 @@ export async function updateHours(input: unknown): Promise<ActionResult> {
   if (error) return FAILED;
 
   revalidatePath("/admin/settings");
+  revalidatePath("/admin");
   revalidatePath("/app");
   revalidatePath("/");
   return { ok: true };
@@ -247,6 +305,7 @@ export async function setOpenOverride(input: unknown): Promise<ActionResult> {
   if (error) return FAILED;
 
   revalidatePath("/admin/settings");
+  revalidatePath("/admin");
   revalidatePath("/app");
   revalidatePath("/");
   return { ok: true };
@@ -271,6 +330,7 @@ export async function setCrowdLevel(input: unknown): Promise<ActionResult> {
   if (error) return FAILED;
 
   revalidatePath("/admin/settings");
+  revalidatePath("/admin");
   revalidatePath("/app");
   revalidatePath("/");
   return { ok: true };

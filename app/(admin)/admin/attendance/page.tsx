@@ -1,7 +1,8 @@
 import { PageHeading } from "@/components/admin/PageHeading";
-import { CheckInPanel } from "@/components/admin/CheckInPanel";
+import { AttendancePanel } from "@/components/admin/AttendancePanel";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getMembers, getStaffGym, getTodayAttendance } from "@/lib/queries/admin";
+import { formatFullDate } from "@/lib/format";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.admin.attendance.title };
@@ -25,8 +26,11 @@ export default async function AdminAttendancePage() {
 
   return (
     <>
-      <PageHeading title={strings.admin.attendance.title} />
-      <CheckInPanel gymId={gym.id} members={members} today={today} />
+      <PageHeading
+        title={strings.admin.attendance.title}
+        subtitle={formatFullDate(new Date().toISOString())}
+      />
+      <AttendancePanel gymId={gym.id} members={members} today={today} />
     </>
   );
 }

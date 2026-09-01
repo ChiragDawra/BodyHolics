@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { MemberHeader } from "@/components/member/MemberHeader";
+import { MemberTabBar } from "@/components/member/MemberTabBar";
+import { ActivityGrid } from "@/components/member/ActivityGrid";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Card, CardBody } from "@/components/ui/Card";
 import { ActivityIcon } from "@/components/ui/icons";
 import { getMemberAttendance, getMemberSnapshot } from "@/lib/queries/member";
-import { formatClock, formatDay, formatMonth } from "@/lib/format";
+import { monthGrids } from "@/lib/attendance";
+import { formatMonth, formatDay } from "@/lib/format";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.member.activityTitle };
@@ -13,18 +15,11 @@ export const dynamic = "force-dynamic";
 export default async function MemberActivityPage() {
   const snapshot = await getMemberSnapshot();
   if (!snapshot) redirect("/join");
+  if (!snapshot.profile.phone) redirect("/app/complete-profile");
 
   const visits = await getMemberAttendance(snapshot.profile.id);
-
-  // Grouped by month, newest first. The query already returns them in order,
-  // so a Map preserves that without a second sort.
-  const byMonth = new Map<string, typeof visits>();
-  for (const visit of visits) {
-    const key = formatMonth(visit.checked_in_at);
-    const bucket = byMonth.get(key);
-    if (bucket) bucket.push(visit);
-    else byMonth.set(key, [visit]);
-  }
+  const months = monthGrids(visits);
+  const oldest = visits[visits.length - 1];
 
   return (
     <>
@@ -37,41 +32,28 @@ export default async function MemberActivityPage() {
           body={strings.member.activityEmptyBody}
         />
       ) : (
-        <div className="space-y-5 px-4 pb-6">
-          <p className="text-sm text-ink-muted">
-            {strings.member.activityTotal(visits.length)}
+        <div className="px-4 pb-32">
+          <p className="mb-3.5 px-1 text-xs text-ink-dim">
+            {strings.member.visitsSince(
+              visits.length,
+              oldest ? formatDay(oldest.checked_in_at) : "",
+            )}
           </p>
 
-          {[...byMonth.entries()].map(([month, monthVisits]) => (
-            <section key={month} className="space-y-2">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="font-display font-semibold text-ink">{month}</h2>
-                <span className="text-xs text-ink-muted">
-                  {strings.member.activityTotal(monthVisits.length)}
-                </span>
-              </div>
-
-              <Card>
-                <CardBody className="divide-y divide-border pt-0">
-                  {monthVisits.map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="flex items-center justify-between gap-4 py-3"
-                    >
-                      <span className="text-ink">
-                        {formatDay(visit.checked_in_at)}
-                      </span>
-                      <span className="font-display text-sm font-semibold text-ink-muted">
-                        {formatClock(visit.checked_in_at)}
-                      </span>
-                    </div>
-                  ))}
-                </CardBody>
-              </Card>
-            </section>
-          ))}
+          <div className="flex flex-col gap-3.5">
+            {months.map((month, i) => (
+              <ActivityGrid
+                key={month.monthKey}
+                month={month}
+                monthLabel={formatMonth(`${month.monthKey}T12:00:00Z`)}
+                highlight={i === 0}
+              />
+            ))}
+          </div>
         </div>
       )}
+
+      <MemberTabBar />
     </>
   );
 }

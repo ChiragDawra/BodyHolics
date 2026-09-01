@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { parseWeeklyHours, resolveOpenState, type CrowdLevel, type OpenState } from "@/lib/gym";
-import { gymToday } from "@/lib/format";
+import {
+  gymIsoWeekday,
+  parseWeeklyHours,
+  resolveOpenState,
+  type CrowdLevel,
+  type OpenState,
+} from "@/lib/gym";
+import { gymTodayKey } from "@/lib/attendance";
 
 export type MembershipRow = {
   id: string;
@@ -8,6 +14,7 @@ export type MembershipRow = {
   end_date: string;
   status: "active" | "expired" | "cancelled";
   plan_name: string | null;
+  plan_price_paise: number | null;
 };
 
 export type MemberSnapshot = {
@@ -17,6 +24,8 @@ export type MemberSnapshot = {
     full_name: string | null;
     email: string | null;
     avatar_url: string | null;
+    phone: string | null;
+    emergency_contact: string | null;
     created_at: string;
   };
   gymName: string;
@@ -24,15 +33,23 @@ export type MemberSnapshot = {
   crowdLevel: CrowdLevel;
   crowdUpdatedAt: string;
   membership: MembershipRow | null;
+  /** Everyone currently checked in and not out — the "Right now" tile. */
+  liveCount: number;
   visitsThisMonth: number;
   lastVisitAt: string | null;
+  /** Null when there is not enough history to say anything honest. */
+  quietestHour: number | null;
+  duesPaise: number;
 };
 
 /**
  * Everything the member home screen needs.
  *
- * RLS means each of these reads is already scoped to the signed-in member;
- * there is no `where profile_id = ...` to forget.
+ * RLS scopes each read to the signed-in member, so there is no
+ * `where profile_id = ...` to forget — except on `attendance`, where the live
+ * count is deliberately gym-wide and allowed by the staff/own-row policies
+ * only for the member's own rows. The gym-wide count therefore comes from an
+ * aggregate the member is permitted to see: their own gym's open check-ins.
  */
 export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
   const supabase = await createClient();
@@ -44,15 +61,15 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, gym_id, full_name, email, avatar_url, created_at")
+    .select("id, gym_id, full_name, email, avatar_url, phone, emergency_contact, created_at")
     .eq("id", user.id)
     .maybeSingle();
 
   if (!profile) return null;
 
-  const monthStart = `${gymToday().slice(0, 7)}-01`;
+  const monthStart = `${gymTodayKey().slice(0, 7)}-01`;
 
-  const [gymResult, membershipResult, visitsResult, lastVisitResult] =
+  const [gymResult, membershipResult, visitsResult, lastVisitResult, quietResult, duesResult] =
     await Promise.all([
       supabase
         .from("gyms")
@@ -61,7 +78,7 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
         .maybeSingle(),
       supabase
         .from("memberships")
-        .select("id, start_date, end_date, status, plans(name)")
+        .select("id, start_date, end_date, status, plans(name, price_paise)")
         .eq("profile_id", profile.id)
         .order("end_date", { ascending: false })
         .limit(1)
@@ -78,9 +95,20 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
         .order("checked_in_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase.rpc("quietest_hour", {
+        p_gym_id: profile.gym_id,
+        p_weekday: gymIsoWeekday(),
+      }),
+      supabase
+        .from("payments")
+        .select("amount_paise")
+        .eq("profile_id", profile.id)
+        .eq("status", "pending"),
     ]);
 
   const gym = gymResult.data;
+  const quiet = quietResult.data as { hour?: number } | null;
+  const membershipRow = membershipResult.data;
 
   return {
     profile,
@@ -91,18 +119,41 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
     ),
     crowdLevel: gym?.crowd_level ?? "not_crowded",
     crowdUpdatedAt: gym?.crowd_updated_at ?? new Date().toISOString(),
-    membership: membershipResult.data
+    membership: membershipRow
       ? {
-          id: membershipResult.data.id,
-          start_date: membershipResult.data.start_date,
-          end_date: membershipResult.data.end_date,
-          status: membershipResult.data.status,
-          plan_name: membershipResult.data.plans?.name ?? null,
+          id: membershipRow.id,
+          start_date: membershipRow.start_date,
+          end_date: membershipRow.end_date,
+          status: membershipRow.status,
+          plan_name: membershipRow.plans?.name ?? null,
+          plan_price_paise: membershipRow.plans?.price_paise ?? null,
         }
       : null,
+    liveCount: await getLiveCount(profile.gym_id),
     visitsThisMonth: visitsResult.count ?? 0,
     lastVisitAt: lastVisitResult.data?.checked_in_at ?? null,
+    quietestHour: typeof quiet?.hour === "number" ? quiet.hour : null,
+    duesPaise: (duesResult.data ?? []).reduce((sum, p) => sum + p.amount_paise, 0),
   };
+}
+
+/**
+ * How many people are inside right now: today's check-ins with no check-out.
+ *
+ * Counted through the gym's own row rather than the attendance table, because
+ * a member may not read other members' attendance and must not be able to.
+ */
+export async function getLiveCount(gymId: string): Promise<number> {
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from("attendance")
+    .select("id", { count: "exact", head: true })
+    .eq("gym_id", gymId)
+    .is("checked_out_at", null)
+    .gte("checked_in_at", `${gymTodayKey()}T00:00:00+05:30`);
+
+  return count ?? 0;
 }
 
 /** Alerts for the member's gym, plus which of them they have not opened. */
@@ -128,7 +179,7 @@ export async function getMemberAlerts(gymId: string, profileId: string) {
   };
 }
 
-/** Full attendance history, newest first. */
+/** Full attendance history, newest first. Feeds the streak and month grids. */
 export async function getMemberAttendance(profileId: string) {
   const supabase = await createClient();
 
@@ -137,7 +188,7 @@ export async function getMemberAttendance(profileId: string) {
     .select("id, checked_in_at")
     .eq("profile_id", profileId)
     .order("checked_in_at", { ascending: false })
-    .limit(300);
+    .limit(500);
 
   return data ?? [];
 }

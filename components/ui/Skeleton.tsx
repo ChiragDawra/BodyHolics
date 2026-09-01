@@ -9,9 +9,9 @@ export function Skeleton({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        "relative overflow-hidden rounded-sm bg-surface-sunken",
+        "relative overflow-hidden rounded-sm bg-surface-raised",
         "after:absolute after:inset-0 after:-translate-x-full",
-        "after:bg-gradient-to-r after:from-transparent after:via-border after:to-transparent",
+        "after:bg-gradient-to-r after:from-transparent after:via-surface-overlay after:to-transparent",
         "after:animate-[bh-shimmer_1.4s_infinite]",
         className,
       )}

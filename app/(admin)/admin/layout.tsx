@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { SignOutButton } from "@/components/admin/SignOutButton";
+import { AdminTabBar } from "@/components/admin/AdminTabBar";
+import { createClient } from "@/lib/supabase/server";
 import { getUser, isStaff } from "@/lib/supabase/auth";
 import { strings } from "@/lib/strings";
 
@@ -10,27 +11,42 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
+export const dynamic = "force-dynamic";
+
 /**
  * Guards the whole dashboard.
  *
  * /admin/login deliberately lives in a separate route group, (admin-auth), so
- * it does not inherit this layout — a layout cannot opt one of its own children
- * out of its guard without a redirect loop.
+ * it does not inherit this layout — a layout cannot opt one of its own
+ * children out of its guard without a redirect loop.
+ *
+ * Note this checks `is_staff()`, not the admin email list. Routing by email in
+ * middleware is a convenience; being on the staff table is the authorisation.
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await getUser();
   if (!user) redirect("/admin/login");
   if (!(await isStaff())) redirect("/admin/login");
 
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, phone")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // The owner gives the desk a number like everyone else.
+  if (!profile?.phone) redirect("/app/complete-profile");
+
   return (
-    <div className="flex min-h-dvh flex-col bg-surface md:flex-row">
-      <AdminSidebar />
-      <div className="flex-1 overflow-x-hidden">
-        <div className="flex items-center justify-end border-b border-border px-6 py-3">
-          <SignOutButton label={strings.admin.signOut} fullWidth={false} />
-        </div>
-        <main className="mx-auto max-w-5xl p-6">{children}</main>
+    <div className="flex min-h-dvh bg-surface">
+      <AdminSidebar name={profile.full_name} email={user.email ?? null} />
+      <div className="min-w-0 flex-1">
+        <main className="mx-auto max-w-6xl px-5 pb-32 pt-6 sm:px-8 sm:pb-10 sm:pt-8">
+          {children}
+        </main>
       </div>
+      <AdminTabBar />
     </div>
   );
 }
