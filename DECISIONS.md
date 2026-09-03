@@ -992,3 +992,87 @@ business holding member dues.
 - **Static data sweep**: no sample, mock, dummy, or placeholder datasets in
   `app/`, `components/`, or `lib/`. The only module-level literal arrays are
   the three navigation definitions, which is what they should be.
+
+---
+
+## Phase 12 — Cash at the desk
+
+### D89. The payment and the membership are one database function
+
+Two writes have to happen together or not at all. Doing them as two statements
+from the server action leaves a real failure mode where the money is recorded
+and the membership is not, or the reverse — and the person who notices is
+standing at the desk having just handed over ₹1,200.
+
+`record_cash_payment(profile_id, plan_id)` inserts both in one transaction and
+returns the dates, so the desk sees what it just sold.
+
+### D90. The amount is never passed in
+
+The function takes a plan, not a price. It reads `price_paise` from the plan
+and puts it through `discounted_price()` itself, so nothing a browser sends
+can decide what a member is charged. The figure rendered in the admin dropdown
+is for the eyes at the desk; it is not the number that gets written.
+
+### D91. `discounted_price()` exists already, as the identity function
+
+Phase 13 needs every price a member sees and every amount they are charged to
+go through one place. Introducing that seam now — a SQL function returning its
+argument unchanged — means Phase 13 replaces one function body instead of
+hunting for pricing logic in three files.
+
+### D92. Renewing early does not throw away paid-for days
+
+If the member still has a membership running, the new one starts the day after
+that one ends rather than today. Otherwise renewing on the 20th of a month
+would silently bin ten days someone had already paid for.
+
+### D93. `verified_at` / `verified_by`, distinct from `recorded_by` / `paid_at`
+
+The brief asks for `verified_at` and `verified_by`. `recorded_by` and
+`paid_at` already exist and, for a payment taken at the desk, all four
+coincide — the same person, the same instant.
+
+They are kept separate because the case that does not coincide is the obvious
+next one: a member saying they have paid, confirmed by staff afterwards.
+`recorded_by`/`paid_at` say who typed it in and when the money moved;
+`verified_*` says who confirmed it. Existing collected payments were
+backfilled from their `paid_at`/`recorded_by`, since by definition staff took
+them.
+
+### D94. The member's dead end became the plan list
+
+A member with no membership saw "No membership yet · Ask at the desk". True,
+but it does not say what the gym sells or what it costs. Both Home and Me now
+show `ChoosePlan`: the active plans, each priced *for that member* through
+`discounted_price`, with their benefits.
+
+There is no button that takes money, because there is nothing behind one yet —
+a "Pay now" that opens nothing is worse than no button. The badge says "Pay at
+the desk", which is the actual mechanism.
+
+### D95. Plans are loaded with the member's detail, not with the members page
+
+The admin's plan dropdown was initially fetched once for the whole page, which
+is wrong the moment prices are per-member: the list would be priced for nobody.
+It moved into `loadDetail(profileId)`, which already runs per selected member.
+
+### Verified
+
+- **Member with no membership** sees "Choose a plan" with the three active
+  plans read from the database — Monthly ₹1,200, Quarterly ₹3,000, Half-year
+  ₹6,000 — and not the deactivated Annual.
+- **Admin takes cash**: selected Monthly in the member detail panel and
+  pressed "Mark paid in cash". The database then held, from one call: a
+  membership 2026-09-03 → 2026-10-03, status active, plan Monthly; and a
+  payment of ₹1,200, method `cash`, status `collected`, with both
+  `verified_at` and `verified_by` set.
+- **The member's countdown reflects it**: the home screen went from the plan
+  list to "Monthly · ACTIVE · 30 days left" with the timeline reading
+  Start 3 Sept / Today 3 Sept / Expiry 3 Oct, and Me shows Price ₹1,200,
+  Started 3 September 2026, Ends 3 October 2026.
+- **Payment history** on Me renders the reference row style with the real row:
+  "3 September" left, "₹1,200" right, "Collected" with a circled tick below.
+- This also closes Phase 11's remaining item — the countdown was exercised
+  against a member *with* an active membership, not just the empty state.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

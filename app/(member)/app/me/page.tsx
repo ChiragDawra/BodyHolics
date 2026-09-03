@@ -7,9 +7,9 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/admin/SignOutButton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { TagIcon, AddSquareIcon } from "@/components/ui/icons";
-import { getMemberSnapshot } from "@/lib/queries/member";
+import { ChoosePlan } from "@/components/member/ChoosePlan";
+import { AddSquareIcon } from "@/components/ui/icons";
+import { getMemberSnapshot, getOfferedPlans } from "@/lib/queries/member";
 import { formatFullDate, formatDay, membershipSpan } from "@/lib/format";
 import { MembershipTimeline } from "@/components/member/MembershipTimeline";
 import { PaymentHistoryRow } from "@/components/member/PaymentHistoryRow";
@@ -26,6 +26,10 @@ export default async function MemberMePage() {
   if (!snapshot.profile.phone) redirect("/app/complete-profile");
 
   const { profile, membership, duesPaise, payments } = snapshot;
+  const plans =
+    membership === null
+      ? await getOfferedPlans(profile.gym_id, profile.id)
+      : [];
   const span = membership
     ? membershipSpan(membership.start_date, membership.end_date)
     : null;
@@ -59,14 +63,15 @@ export default async function MemberMePage() {
           </div>
         </div>
 
-        <Card className="bh-panel px-4.5 py-5">
-          {membership ? (
-            <>
+        {membership === null ? (
+          <ChoosePlan plans={plans} />
+        ) : (
+          <Card className="bh-panel px-4.5 py-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-display text-lg font-bold tracking-tight text-ink">
                   {membership.plan_name ?? ""}
                 </span>
-                <Badge tone={active ? "success" : "danger"}>
+                <Badge dot tone={active ? "success" : "danger"}>
                   {active
                     ? strings.member.membershipActive
                     : membership.status === "cancelled"
@@ -107,15 +112,8 @@ export default async function MemberMePage() {
                   value={formatFullDate(membership.end_date)}
                 />
               </dl>
-            </>
-          ) : (
-            <EmptyState
-              icon={<TagIcon className="h-6 w-6" />}
-              title={strings.member.noMembership}
-              body={strings.member.noMembershipBody}
-            />
-          )}
-        </Card>
+          </Card>
+        )}
 
         {/* Only renders when the gym has actually described the plan. */}
         {membership && membership.plan_benefits.length > 0 ? (

@@ -453,6 +453,42 @@ export async function setCrowdOverride(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
+/* ---------------------------------------------------------------- payments */
+
+/**
+ * Cash at the desk: the payment and the membership it buys, together.
+ *
+ * The price is not passed in. `record_cash_payment` reads it from the plan
+ * and applies the member's discount itself, so nothing a browser sends can
+ * decide what someone is charged.
+ */
+export async function recordCashPayment(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      profileId: z.string().uuid(),
+      planId: z.string().uuid(),
+    })
+    .safeParse(input);
+
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("record_cash_payment", {
+    p_profile_id: parsed.data.profileId,
+    p_plan_id: parsed.data.planId,
+  });
+
+  if (error || !data || data.length === 0) return FAILED;
+
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/revenue");
+  revalidatePath("/admin");
+  revalidatePath("/app");
+  revalidatePath("/app/me");
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------------- alerts */
 
 export async function publishAlert(input: unknown): Promise<ActionResult> {

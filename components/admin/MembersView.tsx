@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
 import { MiniGrid } from "@/components/member/ActivityGrid";
 import { CloseIcon, PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
-import { addMemberManually } from "@/lib/actions/admin";
+import { addMemberManually, recordCashPayment } from "@/lib/actions/admin";
 import type { MemberListRow } from "@/lib/queries/admin";
 import { formatPhone } from "@/lib/gym";
 import { daysUntil, formatDay } from "@/lib/format";
@@ -15,6 +15,14 @@ import { strings } from "@/lib/strings";
 import { cn } from "@/lib/cn";
 
 type Filter = "all" | "active" | "expired" | "none";
+
+export type OfferablePlan = {
+  id: string;
+  name: string;
+  price_paise: number;
+  duration_days: number;
+  payable_paise: number;
+};
 
 export type MemberDetail = {
   memberships: Array<{
@@ -25,6 +33,12 @@ export type MemberDetail = {
     price_paise: number | null;
   }>;
   days: Array<{ key: string; visited: boolean }>;
+  /**
+   * Priced for *this* member. Plans are loaded with the detail rather than
+   * once for the page because the payable figure depends on the member's own
+   * discount, so a list fetched for the page would be the wrong list.
+   */
+  plans: OfferablePlan[];
 };
 
 function isActive(m: MemberListRow): boolean {
@@ -239,7 +253,12 @@ export function MembersView({
           title={selected?.full_name ?? strings.admin.members.title}
         >
           {selected ? (
-            <DetailBody member={selected} detail={detail} onClose={close} hideClose />
+            <DetailBody
+              member={selected}
+              detail={detail}
+              onClose={close}
+              hideClose
+            />
           ) : null}
         </Sheet>
       </div>
@@ -270,7 +289,6 @@ function DetailBody({
   onClose: () => void;
   hideClose?: boolean;
 }) {
-  const [toast, setToast] = useState(false);
   const active = isActive(member);
 
   return (
@@ -375,24 +393,106 @@ function DetailBody({
         <MiniGrid days={detail.days} />
       )}
 
-      <Button
-        variant="disabled"
-        fullWidth
-        className="mt-5"
-        aria-disabled
-        onClick={() => {
-          setToast(true);
-          setTimeout(() => setToast(false), 2600);
+      {detail ? <CashPayment member={member} plans={detail.plans} /> : null}
+    </>
+  );
+}
+
+/**
+ * Taking cash at the desk.
+ *
+ * Admin-initiated and admin-only. A member never requests anything — they are
+ * told to pay at the desk, they hand over the money, and this is where that
+ * becomes a membership. The amount is not entered by hand: it comes from the
+ * plan and the member's discount, computed in the database, so what the
+ * member was quoted on their phone and what is recorded here cannot differ.
+ */
+function CashPayment({
+  member,
+  plans,
+}: {
+  member: MemberListRow;
+  plans: OfferablePlan[];
+}) {
+  const [planId, setPlanId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  if (plans.length === 0) return null;
+
+  const chosen = plans.find((p) => p.id === planId) ?? null;
+
+  const submit = () => {
+    if (!chosen) {
+      setError(strings.admin.members.recordPaymentPickPlan);
+      return;
+    }
+
+    setError(null);
+    startTransition(async () => {
+      const result = await recordCashPayment({
+        profileId: member.id,
+        planId: chosen.id,
+      });
+
+      if (result.ok) {
+        setDone(true);
+        setPlanId("");
+      } else {
+        setError(result.message);
+      }
+    });
+  };
+
+  return (
+    <div className="mt-5 border-t border-border-soft pt-4">
+      <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
+        {strings.admin.members.recordPaymentTitle}
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-ink-dim">
+        {strings.admin.members.recordPaymentBody}
+      </p>
+
+      <select
+        value={planId}
+        aria-label={strings.admin.members.plan}
+        onChange={(e) => {
+          setPlanId(e.target.value);
+          setDone(false);
+          setError(null);
         }}
+        className="mt-3 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-border-strong"
       >
-        {strings.admin.members.recordPayment}
-      </Button>
-      {toast ? (
-        <p role="status" className="mt-2.5 text-xs leading-relaxed text-warning">
-          {strings.admin.members.recordPaymentToast}
+        <option value="">{strings.admin.members.plan}</option>
+        {plans.map((plan) => (
+          <option key={plan.id} value={plan.id}>
+            {plan.name} · {strings.common.rupees(plan.payable_paise)}
+            {plan.payable_paise < plan.price_paise
+              ? ` (${strings.common.rupees(plan.price_paise)})`
+              : ""}
+          </option>
+        ))}
+      </select>
+
+      {error ? (
+        <p role="alert" className="mt-2.5 text-xs text-danger">
+          {error}
         </p>
       ) : null}
-    </>
+
+      {done ? (
+        <p role="status" className="mt-2.5 text-xs text-success">
+          {strings.admin.members.recordPaymentSaved}
+        </p>
+      ) : null}
+
+      <Button fullWidth className="mt-3" disabled={pending} onClick={submit}>
+        {pending
+          ? strings.admin.members.recordPaymentSaving
+          : strings.admin.members.recordPaymentSubmit}
+      </Button>
+    </div>
   );
 }
 

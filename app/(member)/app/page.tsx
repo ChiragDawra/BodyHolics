@@ -10,12 +10,12 @@ import {
 import { StreakCard } from "@/components/member/StreakCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardLabel } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { TagIcon } from "@/components/ui/icons";
+import { ChoosePlan } from "@/components/member/ChoosePlan";
 import {
   getMemberAlerts,
   getMemberAttendance,
   getMemberSnapshot,
+  getOfferedPlans,
 } from "@/lib/queries/member";
 import { computeStreak, visitedDays, weekStrip } from "@/lib/attendance";
 import { formatHour, gymWeekdayLabel } from "@/lib/gym";
@@ -41,9 +41,13 @@ export default async function MemberHomePage() {
   // A member who has not given a phone number has not finished joining.
   if (!snapshot.profile.phone) redirect("/app/complete-profile");
 
-  const [{ alerts, unreadIds }, checkIns] = await Promise.all([
+  const [{ alerts, unreadIds }, checkIns, plans] = await Promise.all([
     getMemberAlerts(snapshot.profile.gym_id, snapshot.profile.id),
     getMemberAttendance(snapshot.profile.id),
+    // Only asked for when there is nothing to show instead.
+    snapshot.membership === null
+      ? getOfferedPlans(snapshot.profile.gym_id, snapshot.profile.id)
+      : Promise.resolve([]),
   ]);
 
   const days = visitedDays(checkIns);
@@ -105,46 +109,42 @@ export default async function MemberHomePage() {
           </div>
         </GymLiveProvider>
 
-        <Card className="bh-rise bh-panel p-4.5">
-          {membership ? (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-ink-muted">
-                  {membership.plan_name ?? ""}
-                </span>
-                <Badge tone={active ? "success" : "danger"}>
-                  {active
-                    ? strings.member.membershipActive
-                    : membership.status === "cancelled"
-                      ? strings.member.membershipCancelled
-                      : strings.member.membershipExpired}
-                </Badge>
-              </div>
+        {membership === null ? (
+          <div className="bh-rise">
+            <ChoosePlan plans={plans} />
+          </div>
+        ) : (
+          <Card className="bh-rise bh-panel p-4.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-ink-muted">
+                {membership.plan_name ?? ""}
+              </span>
+              <Badge dot tone={active ? "success" : "danger"}>
+                {active
+                  ? strings.member.membershipActive
+                  : membership.status === "cancelled"
+                    ? strings.member.membershipCancelled
+                    : strings.member.membershipExpired}
+              </Badge>
+            </div>
 
-              <div className="mt-2.5 flex items-baseline gap-2.5">
-                <span className="font-display text-4xl leading-none font-bold tracking-tighter text-brand">
-                  {span?.daysLeft ?? 0}
-                </span>
-                <span className="text-base text-ink-muted">
-                  {strings.member.daysLeft}
-                </span>
-              </div>
+            <div className="mt-2.5 flex items-baseline gap-2.5">
+              <span className="font-display text-4xl leading-none font-bold tracking-tighter text-brand">
+                {span?.daysLeft ?? 0}
+              </span>
+              <span className="text-base text-ink-muted">
+                {strings.member.daysLeft}
+              </span>
+            </div>
 
-              <div className="mt-5">
-                <MembershipTimeline
-                  startDate={membership.start_date}
-                  endDate={membership.end_date}
-                />
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              icon={<TagIcon className="h-6 w-6" />}
-              title={strings.member.noMembership}
-              body={strings.member.noMembershipBody}
-            />
-          )}
-        </Card>
+            <div className="mt-5">
+              <MembershipTimeline
+                startDate={membership.start_date}
+                endDate={membership.end_date}
+              />
+            </div>
+          </Card>
+        )}
 
         <Card className="bh-rise flex items-center gap-3 px-4.5 py-4">
           <span

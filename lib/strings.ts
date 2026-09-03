@@ -145,6 +145,14 @@ export const strings = {
     noMembership: "No membership yet",
     noMembershipBody:
       "Ask at the desk to start one. It shows up here straight away.",
+    choosePlan: "Choose a plan",
+    choosePlanBody:
+      "Tell the desk which one you want and pay there. It starts the moment they take the money.",
+    payAtDesk: "Pay at the desk",
+    planFor: (duration: string) => `for ${duration}`,
+    noPlans: "No plans on offer yet",
+    noPlansBody: "Ask at the desk what memberships they run.",
+    discountedFrom: (was: string) => `was ${was}`,
 
     bestTime: "Best time today",
     bestTimeValue: (hour: string, weekday: string) =>
@@ -284,9 +292,16 @@ export const strings = {
       attendance30: "Attendance · last 30 days",
       last30: "Last 30 days",
       noMemberships: "No memberships yet",
-      recordPayment: "Record payment",
-      recordPaymentToast:
-        "Online payments coming soon. Record cash at the desk for now.",
+      recordPayment: "Record a cash payment",
+      recordPaymentTitle: "Take payment",
+      recordPaymentBody:
+        "Pick the plan the member is paying for. This records the cash and starts their membership.",
+      recordPaymentSubmit: "Mark paid in cash",
+      recordPaymentSaving: "Recording",
+      recordPaymentDone: (ends: string) => `Membership runs to ${ends}`,
+      recordPaymentPickPlan: "Pick a plan first.",
+      recordPaymentSaved: "Cash recorded and the membership started.",
+      extendsFrom: (date: string) => `Starts ${date}, after the current one ends`,
       done: "Done",
       plan: "Plan",
       startMembership: "Start membership",

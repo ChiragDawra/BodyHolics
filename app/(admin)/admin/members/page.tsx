@@ -1,6 +1,7 @@
 import { MembersView, type MemberDetail } from "@/components/admin/MembersView";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getMemberDetail, getMembers, getStaffGym } from "@/lib/queries/admin";
+import { getOfferedPlans } from "@/lib/queries/member";
 import { last30Days } from "@/lib/attendance";
 import { strings } from "@/lib/strings";
 
@@ -18,7 +19,9 @@ export default async function AdminMembersPage() {
     );
   }
 
-  const members = await getMembers(gym.id);
+  // Captured before the closure below, which loses the null narrowing.
+  const gymId = gym.id;
+  const members = await getMembers(gymId);
 
   /**
    * Detail is fetched per member on selection rather than for all of them up
@@ -27,7 +30,11 @@ export default async function AdminMembersPage() {
    */
   async function loadDetail(profileId: string): Promise<MemberDetail> {
     "use server";
-    const detail = await getMemberDetail(profileId);
+    const [detail, plans] = await Promise.all([
+      getMemberDetail(profileId),
+      getOfferedPlans(gymId, profileId),
+    ]);
+
     return {
       memberships: detail.memberships.map((m) => ({
         id: m.id,
@@ -37,8 +44,21 @@ export default async function AdminMembersPage() {
         price_paise: m.price_paise,
       })),
       days: last30Days(detail.attendance),
+      /**
+       * The list price travels alongside the payable one so the desk can see
+       * when a member is being charged less than the sticker. Neither is the
+       * amount charged — `record_cash_payment` recomputes that in the
+       * database, so nothing sent from a browser can decide it.
+       */
+      plans: plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price_paise: p.price_paise,
+        duration_days: p.duration_days,
+        payable_paise: p.payable_paise,
+      })),
     };
   }
 
-  return <MembersView gymId={gym.id} members={members} loadDetail={loadDetail} />;
+  return <MembersView gymId={gymId} members={members} loadDetail={loadDetail} />;
 }

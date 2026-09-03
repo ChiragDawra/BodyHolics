@@ -356,6 +356,8 @@ export type Database = {
           profile_id: string
           recorded_by: string | null
           status: Database["public"]["Enums"]["payment_status"]
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           amount_paise: number
@@ -370,6 +372,8 @@ export type Database = {
           profile_id: string
           recorded_by?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           amount_paise?: number
@@ -384,6 +388,8 @@ export type Database = {
           profile_id?: string
           recorded_by?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -628,6 +634,10 @@ export type Database = {
         }
         Returns: Json
       }
+      discounted_price: {
+        Args: { p_price_paise: number; p_profile_id: string }
+        Returns: number
+      }
       is_gym_owner: { Args: { p_gym_id: string }; Returns: boolean }
       is_staff: { Args: { p_gym_id: string }; Returns: boolean }
       is_staff_anywhere: { Args: never; Returns: boolean }
@@ -638,6 +648,15 @@ export type Database = {
       quietest_hour: {
         Args: { p_gym_id: string; p_weekday: number }
         Returns: Json
+      }
+      record_cash_payment: {
+        Args: { p_plan_id: string; p_profile_id: string }
+        Returns: {
+          amount_paise: number
+          ends_on: string
+          membership_id: string
+          starts_on: string
+        }[]
       }
       staff_code_valid: { Args: { p_code: string }; Returns: boolean }
     }

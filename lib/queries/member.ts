@@ -9,6 +9,7 @@ import {
 } from "@/lib/gym";
 import { getGymSchedule, type CrowdSlotRow, type HourBlockRow } from "@/lib/queries/gym";
 import { gymTodayKey } from "@/lib/attendance";
+import type { OfferedPlan } from "@/components/member/ChoosePlan";
 
 export type MembershipRow = {
   id: string;
@@ -220,4 +221,44 @@ export async function getMemberAttendance(profileId: string) {
     .limit(500);
 
   return data ?? [];
+}
+
+/**
+ * The plans a member can buy, priced for that member.
+ *
+ * The payable figure comes from `discounted_price` in the database, the same
+ * function `record_cash_payment` uses, so what the member is quoted here and
+ * what the desk charges them cannot drift apart.
+ */
+export async function getOfferedPlans(
+  gymId: string,
+  profileId: string,
+): Promise<OfferedPlan[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("plans")
+    .select("id, name, price_paise, duration_days, benefits")
+    .eq("gym_id", gymId)
+    .eq("is_active", true)
+    .order("duration_days", { ascending: true });
+
+  const plans = data ?? [];
+  if (plans.length === 0) return [];
+
+  const priced = await Promise.all(
+    plans.map(async (plan) => {
+      const { data: payable } = await supabase.rpc("discounted_price", {
+        p_profile_id: profileId,
+        p_price_paise: plan.price_paise,
+      });
+
+      return {
+        ...plan,
+        payable_paise: typeof payable === "number" ? payable : plan.price_paise,
+      };
+    }),
+  );
+
+  return priced;
 }
