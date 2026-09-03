@@ -587,6 +587,13 @@ export type Database = {
         Args: { p_gym_slug: string; p_pin: string }
         Returns: Json
       }
+      check_in_self: {
+        Args: never
+        Returns: {
+          at_time: string
+          created: boolean
+        }[]
+      }
       check_pin_valid: {
         Args: { p_gym_slug: string; p_pin: string }
         Returns: boolean

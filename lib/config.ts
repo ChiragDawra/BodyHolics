@@ -28,3 +28,16 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 export function homeFor(email: string | null | undefined): "/admin" | "/app" {
   return isAdminEmail(email) ? "/admin" : "/app";
 }
+
+/**
+ * Validates a `?next=` destination.
+ *
+ * Must be a same-origin relative path, so a crafted link cannot use the sign-in
+ * flow as an open redirect. Note "//host" is a protocol-relative URL and is
+ * therefore rejected, despite starting with a slash.
+ */
+export function safeNext(value: string | null | undefined, fallback = "/app"): string {
+  if (!value) return fallback;
+  if (!value.startsWith("/") || value.startsWith("//")) return fallback;
+  return value;
+}

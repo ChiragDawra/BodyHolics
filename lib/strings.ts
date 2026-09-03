@@ -153,15 +153,19 @@ export const strings = {
 
     streak: "day streak",
     streakKeepGoing: (longest: number) =>
-      `Keep it going · longest ${longest} days`,
+      longest === 1
+        ? "Keep it going · longest 1 day"
+        : `Keep it going · longest ${longest} days`,
     streakBroken: "Start a new streak today",
 
     visitsThisMonth: (n: number) =>
       n === 1 ? "1 visit this month" : `${n} visits this month`,
     lastVisit: (relative: string) => `Last visit ${relative}`,
 
-    visitsSince: (n: number, date: string) => `${n} visits since ${date}`,
+    visitsSince: (n: number, date: string) =>
+      n === 1 ? `1 visit since ${date}` : `${n} visits since ${date}`,
     visits: "visits",
+    visitsCount: (n: number) => (n === 1 ? "visit" : "visits"),
     daysOfMonth: (visited: number, total: number) =>
       `${visited} of ${total} days`,
     activityEmpty: "No visits yet",
@@ -433,6 +437,21 @@ export const strings = {
       staffSummary: (n: number) => (n === 1 ? "1 account" : `${n} accounts`),
       hoursSummary: (open: string, close: string) => `${open} – ${close}`,
     },
+  },
+
+  /* -------------------------------------------------------------- check-in */
+
+  checkin: {
+    title: "Checked in",
+    done: "You're in",
+    doneBody: "Have a good session.",
+    at: (time: string) => `Checked in at ${time}`,
+    alreadyTitle: "Already checked in",
+    alreadyAt: (time: string) => `You scanned in at ${time}`,
+    alreadyBody: "No need to scan again.",
+    returning: "Taking you back to the app",
+    failedTitle: "Could not check you in",
+    failedBody: "Tell the desk and they will record it for you.",
   },
 
   /* --------------------------------------------------------------- install */

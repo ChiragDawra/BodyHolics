@@ -838,3 +838,99 @@ emphasised.
   delete-then-insert replaces rather than duplicates. Restored afterwards and
   confirmed back to `not_crowded`.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Phase 10 — Check-in by URL
+
+### D79. Check-in is an RPC, not an INSERT policy
+
+An RLS policy broad enough to let a member write their own attendance row is
+also broad enough to let them write a hundred of them, or backdate one. And
+the "no second visit within 30 minutes" rule cannot be expressed as a policy
+at all.
+
+`check_in_self()` is SECURITY DEFINER and is the only way a member can write
+attendance — there is still no member INSERT policy on the table. It decides
+both questions itself and returns `(created, at_time)` so the screen can say
+either "You're in" or "Already checked in", from one round trip.
+
+### D80. The 30-minute rule is guarded by an advisory lock
+
+Two scans a second apart — a double-tap, a prefetch, a flaky signal and a
+retry — would both read "no recent row" and both insert.
+`pg_advisory_xact_lock` on the member's id serialises the check and the insert
+for that member, and releases at the end of the transaction.
+
+### D81. Writing during a GET is safe here *because* of the dedupe
+
+A QR scan is a plain navigation, so the write happens while rendering a GET,
+which is normally a mistake. It is fine here precisely because
+`check_in_self()` is idempotent inside its 30-minute window: a prefetch, a
+double render, or a member refreshing the page records one visit.
+
+Confirmed rather than assumed — three loads of `/checkin` produced exactly one
+attendance row.
+
+### D82. `source='qr'` is the existing `method` column
+
+The brief asks for `source='qr'`. `attendance.method` is already an enum of
+exactly `('manual', 'qr')` from the original schema, so this is that column
+under a different name and no migration was needed.
+
+`recorded_by` stays null for a self check-in. It means "which staff member
+recorded this", and none did; `method = 'qr'` is what says the member did it
+themselves.
+
+### D83. The QR carries no identity, and that is deliberate
+
+The sticker encodes `https://<domain>/checkin` and nothing else — no member
+id, no token, no expiry. It is the same code for everyone and can be
+photographed off the wall freely, because who is checking in comes from the
+session cookie. A stolen photo lets you check *yourself* in, which is not an
+attack, it is the feature.
+
+### D84. Signing in from the door returns to the door
+
+`/checkin` while signed out redirects to `/join?next=/checkin`, and `next` now
+threads through the join page into the OAuth call and back out of the
+callback. A member who has never signed in lands on the check-in screen rather
+than the profile form: asking someone to type a phone number while standing in
+a doorway is how you get a member who does not check in. `/app` collects it a
+moment later.
+
+`safeNext()` moved to `lib/config.ts` and is now shared by the callback route
+and the join page instead of being defined once and open-coded once.
+
+### D85. Copy bugs found by having exactly one visit
+
+Three strings only ever read correctly in the plural, and the first real
+check-in put a 1 into all of them: "1 visits since 3 September", "1 visits",
+and "longest 1 days". All three now branch.
+
+### D86. Unvisited grid cells were effectively invisible
+
+`--color-surface-overlay` on a `--color-surface-raised` card is one step of
+the surface scale, and at that size it reads as empty space rather than as an
+unvisited day — which removes the shape of the month, the entire point of a
+contribution grid. Unvisited cells moved up one more step to
+`--color-surface-high`.
+
+Found by mistaking it for a rendering bug and checking the DOM: all 31 cells
+were present, laid out across five rows at full opacity, and simply could not
+be seen.
+
+### Verified
+
+- **Signed out**: `/checkin` returns `307` to `/join?next=%2Fcheckin`.
+- **Signed in**: the screen showed "You're in · Checked in at 5:12 pm" and
+  redirected itself to `/app` on its own about two seconds later.
+- **Dedupe**: reloading `/checkin` immediately showed "Already checked in ·
+  You scanned in at 5:12 pm · No need to scan again", and the database holds
+  exactly one row for that member, `method = 'qr'`.
+- **It feeds the rest of the app**: the member home went from 0 to "1 in the
+  gym" and from 0 to "1 day streak"; Activity went from the empty state to
+  "1 visit since 3 September" with the 3rd lit in the September grid. "Best
+  time today" still says "Not enough visits yet to call it", which is the
+  honest answer from one visit.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

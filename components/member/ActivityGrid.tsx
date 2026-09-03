@@ -37,7 +37,9 @@ export function ActivityGrid({
         >
           {month.visits}
         </span>
-        <span className="text-sm text-ink-muted">{strings.member.visits}</span>
+        <span className="text-sm text-ink-muted">
+          {strings.member.visitsCount(month.visits)}
+        </span>
       </div>
 
       <div className="grid grid-cols-7 gap-1.5">
@@ -60,7 +62,7 @@ export function ActivityGrid({
               style={{ animationDelay: `${i * 0.014}s` }}
               className={cn(
                 "aspect-square rounded-sm animate-[bh-dot_0.3s_cubic-bezier(0.22,1,0.36,1)_both]",
-                cell.visited ? "bg-brand" : "bg-surface-overlay",
+                cell.visited ? "bg-brand" : "bg-surface-high",
                 cell.isToday && !cell.visited && "ring-1 ring-ink-dim",
               )}
             />
@@ -80,7 +82,7 @@ export function MiniGrid({ days }: { days: Array<{ key: string; visited: boolean
           key={d.key}
           className={cn(
             "aspect-square rounded-[0.1875rem]",
-            d.visited ? "bg-brand" : "bg-surface-overlay",
+            d.visited ? "bg-brand" : "bg-surface-high",
           )}
         />
       ))}

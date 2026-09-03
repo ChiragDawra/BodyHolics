@@ -5,7 +5,7 @@ import { getUser } from "@/lib/supabase/auth";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { homeFor } from "@/lib/config";
+import { homeFor, safeNext } from "@/lib/config";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.join.welcomeTitle };
@@ -25,12 +25,20 @@ export const dynamic = "force-dynamic";
 export default async function JoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ g?: string; error?: string }>;
+  searchParams: Promise<{ g?: string; error?: string; next?: string }>;
 }) {
-  const { g: joinCode, error } = await searchParams;
+  const { g: joinCode, error, next } = await searchParams;
+
+  /**
+   * Where to land after signing in. Someone who arrived here from the check-in
+   * QR goes back to /checkin rather than to the profile form — asking a member
+   * to fill in a phone number while standing in the doorway is how you get a
+   * member who does not check in. /app collects it a moment later.
+   */
+  const destination = safeNext(next, "/app/complete-profile");
 
   const user = await getUser();
-  if (user) redirect(homeFor(user.email));
+  if (user) redirect(next ? safeNext(next) : homeFor(user.email));
 
   const supabase = await createClient();
   const { data: gym } = await supabase
@@ -82,7 +90,7 @@ export default async function JoinPage({
 
         <GoogleSignInButton
           label={strings.join.signInWithGoogle}
-          next="/app/complete-profile"
+          next={destination}
         />
         <p className="mt-4 text-center text-xs leading-relaxed text-ink-dim">
           {strings.join.footnote}
