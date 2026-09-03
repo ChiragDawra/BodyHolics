@@ -36,10 +36,16 @@ export function Card({
   );
 }
 
-/** The small tracked label above a number. Used on every stat tile. */
+/**
+ * The small tracked label above a number. Used on every stat tile.
+ *
+ * Uppercase and letter-spaced so it reads as a caption for the value beneath
+ * it rather than as a line of text in its own right — at sentence case and
+ * body size these start competing with the number they are labelling.
+ */
 export function CardLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+    <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
       {children}
     </p>
   );

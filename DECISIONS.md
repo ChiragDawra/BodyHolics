@@ -617,3 +617,129 @@ delete from public.staff where id = '5420f88c-7b3d-4f2e-9285-2853b012181d';
   three of four segments lit, caption changed to "Most stations are busy."
 - **Restored** — "Follow hours" and "Not crowded" returned the row to
   `is_open_override: null`, `crowd_level: not_crowded`, confirmed over REST.
+
+---
+
+## Theme — GymOS extraction
+
+Colour, type, and card language taken from five GymOS reference screens. A
+theme extraction only: no screen layout, no tab arrangement, and no
+information architecture came across. The bento grid and every screen
+structure are untouched.
+
+### D64. Two purples, and they are not interchangeable
+
+The references use a light lavender for large filled surfaces (primary
+buttons, progress fills, the highlighted number, the active tab) and a
+saturated indigo for the occasional element that has to out-rank a lavender
+one beside it. Collapsing them into one token loses the distinction the
+reference is actually making, so both exist:
+
+- `--color-brand: #B9AEFF` — the lavender. Light, so `--color-on-brand` is a
+  near-black indigo, never white.
+- `--color-brand-strong: #6355F0` — the indigo, with white text.
+
+Lavender is the default. If both appear with equal weight on one screen, one
+of them is wrong.
+
+### D65. Card elevation is a tinted surface scale, not a shadow
+
+Every surface step now carries slightly more blue than red, so a card reads as
+a lifted panel rather than a flat grey box on black. The tint is deliberately
+below the point where anyone would call it purple — it is elevation, not
+decoration.
+
+`.bh-panel` adds the top-left lit gradient the reference uses on the one card
+per screen carrying the headline fact (the membership card). It is built from
+`color-mix` of two existing tokens rather than a new colour, so it survives a
+palette change.
+
+### D66. Badges became capsules; labels became uppercase and tracked
+
+`Badge` is `rounded-full` with a tinted background and full-opacity text, plus
+an optional leading dot for the states a member checks at a glance. Capsule
+rather than rounded rectangle so it never reads as a button — a badge states a
+fact, it is not something to press.
+
+`CardLabel` and the twelve places that had open-coded the same treatment now
+share one style: `--text-label` (11px) at `--tracking-label`, uppercase. Two
+strings in `strings.ts` were written in capitals (`"MEMBERSHIP HISTORY"`);
+shouting belongs to CSS, so they are sentence case now and the style
+uppercases them.
+
+### D67. The membership card shows a timeline, not a bare progress bar
+
+`MembershipTimeline` replaces the 3px progress rule on both the home screen
+and Me. A countdown says how long is left but not how far through you are — 23
+days is most of a monthly plan and almost none of an annual one. The line puts
+the number in its span, with real dates at both ends.
+
+The Today marker is a donut rather than a dot so it stays legible when it
+lands on top of either end. Its dot sits at the true position but its *label*
+is clamped to 18–82%, because on the first or last day of a membership the
+marker genuinely is on top of "Start" or "Expiry", and a label overlapping a
+date is worse than a label sitting slightly beside its dot.
+
+### D68. `membershipSpan()` replaced two different inline calculations
+
+Both member screens computed the countdown and the progress percentage inline,
+and they did not agree: the span came from millisecond timestamps while the
+countdown came from `daysUntil`, so the bar and the number could differ by a
+day either side of midnight. One function, one answer, in `lib/format.ts`.
+
+### D69. Plan benefits are a real column, so the checklist is never invented
+
+The reference has a plan-benefit checklist. `plans` had nowhere to read one
+from, so that list could only have been hardcoded in the component — the one
+thing this design does not permit. `plans.benefits text[]` is what the owner
+types into from Gym settings, one per line. `CheckList` renders nothing at all
+for an empty array, so a plan nobody has described shows no section rather
+than a heading over a placeholder.
+
+### D70. Payment history on Me is the member's own rows
+
+The same query that computes what a member owes now returns their whole
+payment list, so the reference's payment-row style (date left, amount right,
+status icon and word underneath) has real data behind it. The status goes on
+its own line because on a phone the two things a member scans for are "when"
+and "how much"; those keep the full width and stay aligned down the list.
+
+### D71. Bug found while checking the reskin: every tab lit up at once
+
+`TabBar` marked a tab active on `pathname.startsWith(tab.href + "/")`. On
+`/app/me` that also matches the Home tab (`/app`), so two tabs read as
+current on every subpage. The most specific matching tab now wins.
+
+### D72. Bug found while checking the reskin: staff RLS was infinitely recursive
+
+The Staff panel and the staff code in Gym settings were rendering empty. The
+cause was not the component:
+
+```
+ERROR: 42P17: infinite recursion detected in policy for relation "staff"
+```
+
+`owners manage staff` is a `FOR ALL` policy on `public.staff` whose `USING`
+clause selects from `public.staff`. Evaluating it required reading the table,
+which required evaluating it. Because it is `FOR ALL` it governs SELECT too,
+so *every* read of the staff table failed — not just an owner's writes.
+`owners manage staff codes` then failed with it, since deciding that policy
+meant reading `staff`.
+
+`getStaff()` destructures only `data` and ignores `error`, which is why a hard
+Postgres error surfaced as a quietly empty list. That swallowing is worth
+revisiting across the query layer; it is what let this sit unnoticed.
+
+Fixed by `is_gym_owner(uuid)`, SECURITY DEFINER for the same reason
+`is_staff()` already was — it does not re-enter the table's own RLS.
+
+### Verified
+
+- Member Me and the admin Gym settings render on the new palette: tinted
+  panels, capsule badges, uppercase tracked labels, lavender primary button.
+- Tab bar: on `/app/me` only Me is active. Was Home *and* Me before the fix.
+- Staff RLS, by impersonating the signed-in account's JWT in SQL: reads were
+  `gyms=1 staff=0 staff_codes=0` failing with 42P17 before the migration, and
+  `gyms=1 staff=4 staff_codes=1` after. The Gym settings panel now lists four
+  staff accounts and the staff code, having shown neither before.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

@@ -37,7 +37,7 @@ export function QuickAlert({ gymId }: { gymId: string }) {
 
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-4">
-      <p className="mb-3 font-body text-xs font-medium tracking-wide text-ink-dim">
+      <p className="mb-3 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {strings.admin.dashboard.quickAlert}
       </p>
 

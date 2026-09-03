@@ -19,7 +19,8 @@ import {
 } from "@/lib/queries/member";
 import { computeStreak, visitedDays, weekStrip } from "@/lib/attendance";
 import { formatHour, gymWeekdayLabel } from "@/lib/gym";
-import { daysUntil, formatDay, formatRelative } from "@/lib/format";
+import { formatRelative, membershipSpan } from "@/lib/format";
+import { MembershipTimeline } from "@/components/member/MembershipTimeline";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.member.homeTitle };
@@ -50,24 +51,10 @@ export default async function MemberHomePage() {
   const week = weekStrip(days);
 
   const membership = snapshot.membership;
-  const left = membership ? daysUntil(membership.end_date) : 0;
-  const active =
-    membership !== null && membership.status === "active" && left >= 0;
-
-  // How far through the membership we are, for the progress rule.
-  const spanDays = membership
-    ? Math.max(
-        1,
-        Math.round(
-          (new Date(membership.end_date).getTime() -
-            new Date(membership.start_date).getTime()) /
-            86_400_000,
-        ),
-      )
-    : 1;
-  const elapsedPct = membership
-    ? Math.min(100, Math.max(0, Math.round(((spanDays - left) / spanDays) * 100)))
-    : 0;
+  const span = membership
+    ? membershipSpan(membership.start_date, membership.end_date)
+    : null;
+  const active = membership !== null && membership.status === "active";
 
   return (
     <>
@@ -117,7 +104,7 @@ export default async function MemberHomePage() {
           </div>
         </GymLiveProvider>
 
-        <Card className="bh-rise p-4.5">
+        <Card className="bh-rise bh-panel p-4.5">
           {membership ? (
             <>
               <div className="flex items-center justify-between gap-3">
@@ -135,23 +122,19 @@ export default async function MemberHomePage() {
 
               <div className="mt-2.5 flex items-baseline gap-2.5">
                 <span className="font-display text-4xl leading-none font-bold tracking-tighter text-brand">
-                  {left}
+                  {span?.daysLeft ?? 0}
                 </span>
                 <span className="text-base text-ink-muted">
                   {strings.member.daysLeft}
                 </span>
               </div>
 
-              <div className="mt-4 h-[0.1875rem] overflow-hidden rounded-full bg-surface-overlay">
-                <div
-                  className="h-full origin-left rounded-full bg-brand animate-[bh-bar_0.9s_cubic-bezier(0.22,1,0.36,1)_both]"
-                  style={{ width: `${elapsedPct}%` }}
+              <div className="mt-5">
+                <MembershipTimeline
+                  startDate={membership.start_date}
+                  endDate={membership.end_date}
                 />
               </div>
-
-              <p className="mt-2.5 text-xs text-ink-dim">
-                {strings.member.membershipEndsOn(formatDay(membership.end_date))}
-              </p>
             </>
           ) : (
             <EmptyState

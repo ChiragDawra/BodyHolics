@@ -34,7 +34,7 @@ export function RevenueChart({ months }: { months: MonthlyRevenue[] }) {
 
   return (
     <div className="flex gap-3.5">
-      <div className="flex flex-none flex-col justify-between py-0.5 font-mono text-[0.625rem] text-ink-faint">
+      <div className="flex flex-none flex-col justify-between py-0.5 font-mono text-label text-ink-faint">
         {axis.map((v) => (
           <span key={v}>{shortRupees(v)}</span>
         ))}
@@ -115,7 +115,7 @@ export function RevenueBars({ months }: { months: MonthlyRevenue[] }) {
                 isLast ? "bg-brand" : "bg-surface-high"
               }`}
             />
-            <span className="text-[0.625rem] text-ink-dim">{m.label}</span>
+            <span className="text-label text-ink-dim">{m.label}</span>
           </span>
         );
       })}

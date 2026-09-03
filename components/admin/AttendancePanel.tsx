@@ -76,7 +76,7 @@ export function AttendancePanel({
     <>
       <div className="grid gap-3.5 lg:grid-cols-3">
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.attendance.checkinsToday}
           </p>
           <p className="mt-3.5 font-display text-5xl leading-none font-bold tracking-tighter text-brand">
@@ -85,7 +85,7 @@ export function AttendancePanel({
         </div>
 
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.attendance.inGymNow}
           </p>
           <p className="mt-3.5 font-display text-5xl leading-none font-bold tracking-tighter text-ink">
@@ -94,7 +94,7 @@ export function AttendancePanel({
         </div>
 
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <p className="mb-3 font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="mb-3 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.attendance.checkSomeoneIn}
           </p>
           <label className="relative block">
@@ -164,7 +164,7 @@ export function AttendancePanel({
           />
         ) : (
           <>
-            <div className="hidden grid-cols-[1.4fr_1fr_1fr_0.8fr] gap-4 border-b border-border px-5 py-3 font-body text-[0.625rem] font-medium tracking-wider text-ink-dim lg:grid">
+            <div className="hidden grid-cols-[1.4fr_1fr_1fr_0.8fr] gap-4 border-b border-border px-5 py-3 font-body text-label font-semibold tracking-label uppercase text-ink-dim lg:grid">
               <span>{strings.admin.attendance.colMember}</span>
               <span>{strings.admin.attendance.colIn}</span>
               <span>{strings.admin.attendance.colOut}</span>

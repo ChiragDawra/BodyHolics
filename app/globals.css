@@ -17,41 +17,59 @@
 
 @theme {
   /* Surfaces, back to front. Base is the page; raised is a card; overlay is
-     a control or sheet sitting on top of a card. */
-  --color-surface: #0F0F0E;
-  --color-surface-raised: #1A1A18;
-  --color-surface-overlay: #242422;
-  --color-surface-high: #2E2E2B;
+     a control or sheet sitting on top of a card.
+
+     Every step carries a little more blue than red, so a card reads as a
+     panel lifted off the page rather than a flat grey box on black. The
+     tint is deliberately below the threshold where anyone would call it
+     "purple" — it is elevation, not decoration. */
+  --color-surface: #0A0A0C;
+  --color-surface-raised: #17161C;
+  --color-surface-overlay: #211F29;
+  --color-surface-high: #2C2A36;
 
   /* Text, brightest to faintest */
-  --color-ink: #F2F1ED;
-  --color-ink-muted: #A8A8A1;
-  --color-ink-dim: #7A7A74;
-  --color-ink-faint: #5E5E56;
+  --color-ink: #F3F2F7;
+  --color-ink-muted: #A6A4B4;
+  --color-ink-dim: #79768A;
+  --color-ink-faint: #5B5869;
 
-  /* Brand — the orange of rusted iron under gym lighting.
-     on-brand is near-black, not white: this orange is bright enough that
-     white text on it fails contrast. */
-  --color-brand: #E2683C;
-  --color-brand-hover: #F0844F;
-  --color-brand-subtle: #2A1610;
-  --color-on-brand: #141310;
+  /* Brand.
+
+     Two purples, and they are not interchangeable:
+
+     --color-brand is the lavender. It carries every large filled surface —
+     primary buttons, progress fills, the highlighted number on a card, the
+     active tab. It is light, so text on it is near-black indigo, never white.
+
+     --color-brand-strong is the saturated indigo. It is for the rare element
+     that has to out-rank a lavender one next to it, and it takes white text.
+     Reach for the lavender first; if both are on screen with equal weight,
+     one of them is wrong. */
+  --color-brand: #B9AEFF;
+  --color-brand-hover: #CCC4FF;
+  --color-brand-strong: #6355F0;
+  --color-brand-subtle: #1C1830;
+  --color-on-brand: #1E1A4D;
+  --color-on-brand-strong: #FFFFFF;
 
   /* Lines */
-  --color-border: #2E2E2B;
-  --color-border-soft: #242422;
-  --color-border-strong: #3A3A36;
+  --color-border: #2A2833;
+  --color-border-soft: #201E28;
+  --color-border-strong: #3A3746;
 
   /* Status */
-  --color-success: #3AAF57;
-  --color-warning: #D4940A;
-  --color-danger: #E05545;
+  --color-success: #34C77B;
+  --color-warning: #E0A33A;
+  --color-danger: #E5544B;
 
-  /* How busy the gym is. Semantic — these must survive a palette change. */
-  --color-crowd-low: #3AAF57;
-  --color-crowd-mid: #D4940A;
-  --color-crowd-high: #E2683C;
-  --color-crowd-peak: #E05545;
+  /* How busy the gym is. Semantic — these must survive a palette change.
+     Green through red rather than shades of the brand, because "how full is
+     it" is a reading, and a reading needs a scale a member already knows. */
+  --color-crowd-low: #34C77B;
+  --color-crowd-mid: #E0A33A;
+  --color-crowd-high: #EE7B45;
+  --color-crowd-peak: #E5544B;
 
   /* Type. Two faces, obviously different — a subtle contrast reads as an
      accident. DM Sans is the voice; Inter carries the reading. */
@@ -67,6 +85,12 @@
   --text-3xl: 2rem;
   --text-4xl: 2.75rem;
   --text-5xl: 3.25rem;
+
+  /* The small tracked heading that sits above a group of data. Smaller than
+     --text-xs on purpose: it is a caption for the number under it, and at
+     12px it starts competing with body text. */
+  --text-label: 0.6875rem;
+  --tracking-label: 0.09em;
 
   --space-unit: 0.25rem;
   /* Tailwind derives its whole spacing scale from this. */
@@ -113,6 +137,22 @@
   ::placeholder {
     color: var(--color-ink-faint);
   }
+}
+
+/* --- Surface treatments ------------------------------------------------- */
+
+/**
+ * The one card on a screen that carries the headline fact — the membership
+ * panel — is lit from the top left rather than filled flat. The gradient is
+ * two steps of the existing surface scale, so it stays inside the palette and
+ * survives a token change; it is not a separate colour.
+ */
+.bh-panel {
+  background-image: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--color-brand) 7%, var(--color-surface-overlay)),
+    var(--color-surface-raised) 62%
+  );
 }
 
 /* Respect the system setting. Anything decorative stops moving. */

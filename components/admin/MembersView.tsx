@@ -159,7 +159,7 @@ export function MembersView({
         <div className="flex items-start gap-3.5">
           <div className="min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface-raised">
             {/* Column headings are desktop-only; the phone list is cards. */}
-            <div className="hidden grid-cols-[1.5fr_1.8fr_1.2fr_0.8fr_0.8fr] gap-4 border-b border-border px-5 py-3 font-body text-[0.625rem] font-medium tracking-wider text-ink-dim lg:grid">
+            <div className="hidden grid-cols-[1.5fr_1.8fr_1.2fr_0.8fr_0.8fr] gap-4 border-b border-border px-5 py-3 font-body text-label font-semibold tracking-label uppercase text-ink-dim lg:grid">
               <span>{strings.admin.members.colName}</span>
               <span>{strings.admin.members.colEmail}</span>
               <span>{strings.admin.members.colPhone}</span>
@@ -305,7 +305,7 @@ function DetailBody({
 
       <div className="mt-4.5 grid grid-cols-2 gap-2.5">
         <div className="rounded-md border border-border bg-surface p-3.5">
-          <p className="font-body text-[0.625rem] font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.members.status}
           </p>
           <p
@@ -322,7 +322,7 @@ function DetailBody({
           </p>
         </div>
         <div className="rounded-md border border-border bg-surface p-3.5">
-          <p className="font-body text-[0.625rem] font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.members.pendingDues}
           </p>
           <p
@@ -338,7 +338,7 @@ function DetailBody({
         </div>
       </div>
 
-      <p className="mb-2.5 mt-5 font-body text-[0.625rem] font-medium tracking-wider text-ink-dim">
+      <p className="mb-2.5 mt-5 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {strings.admin.members.membershipHistory}
       </p>
       {detail === null ? (
@@ -366,7 +366,7 @@ function DetailBody({
         ))
       )}
 
-      <p className="mb-2.5 mt-5 font-body text-[0.625rem] font-medium tracking-wider text-ink-dim">
+      <p className="mb-2.5 mt-5 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {strings.admin.members.attendance30}
       </p>
       {detail === null ? (
@@ -472,7 +472,7 @@ function AddMemberSheet({
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block font-body text-xs font-medium tracking-wide text-ink-dim">
+      <span className="mb-1.5 block font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {label}
       </span>
       {children}

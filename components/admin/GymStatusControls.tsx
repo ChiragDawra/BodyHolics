@@ -79,7 +79,7 @@ export function GymStatusControls({
         )}
       >
         <div>
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.dashboard.gymStatus}
           </p>
           <div className="mt-2 flex items-center gap-2.5">
@@ -124,7 +124,7 @@ export function GymStatusControls({
         )}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.settings.crowdHeading}
           </p>
           <p className={cn("font-display text-[0.9375rem] font-bold", CROWD_TEXT[crowd])}>

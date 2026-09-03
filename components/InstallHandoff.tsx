@@ -55,7 +55,7 @@ export function InstallHandoff() {
 
         {platform === "ios-safari" ? (
           <div className="mt-6 rounded-md border border-border bg-surface-raised p-4">
-            <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+            <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
               {strings.join.iosHeading}
             </p>
             <p className="mt-2.5 text-sm leading-loose text-ink-muted">

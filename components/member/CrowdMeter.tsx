@@ -14,7 +14,7 @@ export function CrowdMeter({ level }: { level: CrowdLevel }) {
 
   return (
     <div>
-      <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+      <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {strings.member.crowdHeading}
       </p>
 

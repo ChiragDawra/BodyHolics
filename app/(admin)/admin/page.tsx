@@ -131,7 +131,7 @@ export default async function AdminDashboardPage() {
       <div className="mt-3.5 grid gap-3.5 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-surface-raised p-5">
           <div className="mb-1.5 flex items-baseline justify-between gap-3">
-            <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+            <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
               {strings.admin.dashboard.recentRegistrations}
             </p>
             <Link
@@ -172,7 +172,7 @@ export default async function AdminDashboardPage() {
 
       <div className="mt-3.5 hidden rounded-lg border border-border bg-surface-raised px-6 pb-4 pt-5 sm:block">
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.dashboard.revenueTrend}
           </p>
           <p className="text-xs text-ink-dim">

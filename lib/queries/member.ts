@@ -16,6 +16,7 @@ export type MembershipRow = {
   status: "active" | "expired" | "cancelled";
   plan_name: string | null;
   plan_price_paise: number | null;
+  plan_benefits: string[];
 };
 
 export type MemberSnapshot = {
@@ -45,6 +46,15 @@ export type MemberSnapshot = {
   /** Null when there is not enough history to say anything honest. */
   quietestHour: number | null;
   duesPaise: number;
+  /** The member's own payments, newest first. Empty is a real answer. */
+  payments: MemberPaymentRow[];
+};
+
+export type MemberPaymentRow = {
+  id: string;
+  paid_at: string;
+  amount_paise: number;
+  status: "collected" | "pending" | "refunded";
 };
 
 /**
@@ -74,7 +84,7 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
 
   const monthStart = `${gymTodayKey().slice(0, 7)}-01`;
 
-  const [gymResult, membershipResult, visitsResult, lastVisitResult, quietResult, duesResult] =
+  const [gymResult, membershipResult, visitsResult, lastVisitResult, quietResult, paymentsResult] =
     await Promise.all([
       supabase
         .from("gyms")
@@ -83,7 +93,7 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
         .maybeSingle(),
       supabase
         .from("memberships")
-        .select("id, start_date, end_date, status, plans(name, price_paise)")
+        .select("id, start_date, end_date, status, plans(name, price_paise, benefits)")
         .eq("profile_id", profile.id)
         .order("end_date", { ascending: false })
         .limit(1)
@@ -106,9 +116,10 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
       }),
       supabase
         .from("payments")
-        .select("amount_paise")
+        .select("id, paid_at, amount_paise, status")
         .eq("profile_id", profile.id)
-        .eq("status", "pending"),
+        .order("paid_at", { ascending: false })
+        .limit(24),
     ]);
 
   const gym = gymResult.data;
@@ -133,13 +144,19 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
           status: membershipRow.status,
           plan_name: membershipRow.plans?.name ?? null,
           plan_price_paise: membershipRow.plans?.price_paise ?? null,
+          plan_benefits: membershipRow.plans?.benefits ?? [],
         }
       : null,
     liveCount: await getLiveCount(profile.gym_id),
     visitsThisMonth: visitsResult.count ?? 0,
     lastVisitAt: lastVisitResult.data?.checked_in_at ?? null,
     quietestHour: typeof quiet?.hour === "number" ? quiet.hour : null,
-    duesPaise: (duesResult.data ?? []).reduce((sum, p) => sum + p.amount_paise, 0),
+    // One read, two answers: the whole history for the member's payments
+    // list, and the pending rows within it summed for what they still owe.
+    payments: paymentsResult.data ?? [],
+    duesPaise: (paymentsResult.data ?? [])
+      .filter((p) => p.status === "pending")
+      .reduce((sum, p) => sum + p.amount_paise, 0),
   };
 }
 

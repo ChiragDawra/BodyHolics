@@ -153,6 +153,21 @@ const planSchema = z.object({
   // Entered in whole rupees, stored as paise.
   priceRupees: z.coerce.number().int().min(0).max(1_000_000),
   durationDays: z.coerce.number().int().min(1).max(3650),
+  /**
+   * Typed one per line in the settings form. Blank lines are dropped, so an
+   * empty box means an empty array and the member's benefits checklist
+   * renders nothing rather than an empty heading.
+   */
+  benefits: z
+    .string()
+    .default("")
+    .transform((v) =>
+      v
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .slice(0, 12),
+    ),
 });
 
 export async function createPlan(input: unknown): Promise<ActionResult> {
@@ -166,11 +181,13 @@ export async function createPlan(input: unknown): Promise<ActionResult> {
     name: parsed.data.name,
     price_paise: parsed.data.priceRupees * 100,
     duration_days: parsed.data.durationDays,
+    benefits: parsed.data.benefits,
   });
 
   if (error) return FAILED;
 
-  revalidatePath("/admin/plans");
+  revalidatePath("/admin/settings");
+  revalidatePath("/app/me");
   return { ok: true };
 }
 
@@ -186,12 +203,14 @@ export async function updatePlan(input: unknown): Promise<ActionResult> {
       name: parsed.data.name,
       price_paise: parsed.data.priceRupees * 100,
       duration_days: parsed.data.durationDays,
+      benefits: parsed.data.benefits,
     })
     .eq("id", parsed.data.planId);
 
   if (error) return FAILED;
 
-  revalidatePath("/admin/plans");
+  revalidatePath("/admin/settings");
+  revalidatePath("/app/me");
   return { ok: true };
 }
 
@@ -210,7 +229,8 @@ export async function togglePlan(input: unknown): Promise<ActionResult> {
 
   if (error) return FAILED;
 
-  revalidatePath("/admin/plans");
+  revalidatePath("/admin/settings");
+  revalidatePath("/app/me");
   return { ok: true };
 }
 

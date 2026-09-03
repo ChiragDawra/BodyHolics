@@ -22,8 +22,28 @@ export type Tab = {
  * `pb-[env(safe-area-inset-bottom)]` on the wrapper is what keeps it above the
  * iOS home indicator.
  */
+/**
+ * Which tab owns the current URL.
+ *
+ * Prefix matching alone lights up every ancestor: on /app/me the Home tab
+ * (/app) matches `startsWith("/app/")` too, so two tabs read as current. The
+ * most specific matching tab wins instead, which is the one the member
+ * actually navigated to.
+ */
+function activeHref(tabs: Tab[], pathname: string): string | null {
+  let best: string | null = null;
+
+  for (const tab of tabs) {
+    if (pathname !== tab.href && !pathname.startsWith(`${tab.href}/`)) continue;
+    if (best === null || tab.href.length > best.length) best = tab.href;
+  }
+
+  return best;
+}
+
 export function TabBar({ tabs }: { tabs: Tab[] }) {
   const pathname = usePathname();
+  const current = activeHref(tabs, pathname);
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
@@ -36,8 +56,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
         )}
       >
         {tabs.map((tab) => {
-          const active =
-            pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active = tab.href === current;
           const Icon = tab.icon;
 
           return (
@@ -47,7 +66,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex flex-1 flex-col items-center justify-center gap-1.5",
-                "font-display text-[0.625rem] font-semibold transition-colors",
+                "font-display text-label font-semibold transition-colors",
                 active ? "text-brand" : "text-ink-dim",
               )}
             >

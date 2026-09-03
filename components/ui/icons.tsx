@@ -92,6 +92,15 @@ export function CheckIcon({ className, strokeWidth = 2 }: IconProps) {
   );
 }
 
+export function CheckCircleIcon({ className, strokeWidth = 2 }: IconProps) {
+  return (
+    <svg {...base(className)} strokeWidth={strokeWidth}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.25 2.5 2.5 4.5-5" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ className, strokeWidth = 2 }: IconProps) {
   return (
     <svg {...base(className)} strokeWidth={strokeWidth}>

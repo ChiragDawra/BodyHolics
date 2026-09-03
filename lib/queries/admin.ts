@@ -157,7 +157,7 @@ export async function getPlans(gymId: string) {
 
   const { data } = await supabase
     .from("plans")
-    .select("id, name, price_paise, duration_days, is_active, created_at")
+    .select("id, name, price_paise, duration_days, is_active, benefits, created_at")
     .eq("gym_id", gymId)
     .order("duration_days", { ascending: true });
 

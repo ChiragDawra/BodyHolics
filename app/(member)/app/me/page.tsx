@@ -10,7 +10,10 @@ import { SignOutButton } from "@/components/admin/SignOutButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TagIcon, AddSquareIcon } from "@/components/ui/icons";
 import { getMemberSnapshot } from "@/lib/queries/member";
-import { formatFullDate, formatDay, daysUntil } from "@/lib/format";
+import { formatFullDate, formatDay, membershipSpan } from "@/lib/format";
+import { MembershipTimeline } from "@/components/member/MembershipTimeline";
+import { PaymentHistoryRow } from "@/components/member/PaymentHistoryRow";
+import { CheckList } from "@/components/ui/CheckList";
 import { formatPhone } from "@/lib/gym";
 import { strings } from "@/lib/strings";
 
@@ -22,24 +25,11 @@ export default async function MemberMePage() {
   if (!snapshot) redirect("/join");
   if (!snapshot.profile.phone) redirect("/app/complete-profile");
 
-  const { profile, membership, duesPaise } = snapshot;
-  const left = membership ? daysUntil(membership.end_date) : 0;
-  const active =
-    membership !== null && membership.status === "active" && left >= 0;
-
-  const spanDays = membership
-    ? Math.max(
-        1,
-        Math.round(
-          (new Date(membership.end_date).getTime() -
-            new Date(membership.start_date).getTime()) /
-            86_400_000,
-        ),
-      )
-    : 1;
-  const elapsedPct = membership
-    ? Math.min(100, Math.max(0, Math.round(((spanDays - left) / spanDays) * 100)))
-    : 0;
+  const { profile, membership, duesPaise, payments } = snapshot;
+  const span = membership
+    ? membershipSpan(membership.start_date, membership.end_date)
+    : null;
+  const active = membership !== null && membership.status === "active";
 
   const initial = (profile.full_name ?? profile.email ?? "?")
     .charAt(0)
@@ -69,7 +59,7 @@ export default async function MemberMePage() {
           </div>
         </div>
 
-        <Card className="px-4.5 py-5">
+        <Card className="bh-panel px-4.5 py-5">
           {membership ? (
             <>
               <div className="flex items-center justify-between gap-3">
@@ -87,17 +77,17 @@ export default async function MemberMePage() {
 
               <div className="mt-4 flex items-baseline gap-2.5">
                 <span className="font-display text-5xl leading-none font-bold tracking-tighter text-brand">
-                  {left}
+                  {span?.daysLeft ?? 0}
                 </span>
                 <span className="text-base text-ink-muted">
                   {strings.member.daysLeft}
                 </span>
               </div>
 
-              <div className="mt-4.5 mb-4.5 h-[0.1875rem] overflow-hidden rounded-full bg-surface-overlay">
-                <div
-                  className="h-full origin-left rounded-full bg-brand animate-[bh-bar_0.9s_cubic-bezier(0.22,1,0.36,1)_both]"
-                  style={{ width: `${elapsedPct}%` }}
+              <div className="mt-5 mb-5">
+                <MembershipTimeline
+                  startDate={membership.start_date}
+                  endDate={membership.end_date}
                 />
               </div>
 
@@ -127,6 +117,16 @@ export default async function MemberMePage() {
           )}
         </Card>
 
+        {/* Only renders when the gym has actually described the plan. */}
+        {membership && membership.plan_benefits.length > 0 ? (
+          <Card className="p-4.5">
+            <CardLabel>{strings.member.planBenefits}</CardLabel>
+            <div className="mt-3.5">
+              <CheckList items={membership.plan_benefits} />
+            </div>
+          </Card>
+        ) : null}
+
         {/* Payments are explicitly out of scope for this build. The control is
             shown but visibly off, so the owner can see where it will live. */}
         <Card className="p-4.5">
@@ -142,6 +142,21 @@ export default async function MemberMePage() {
             <PayDuesButton />
           </div>
           <p className="mt-3 text-xs text-ink-faint">{strings.member.comingSoon}</p>
+        </Card>
+
+        <Card className="px-4.5 pb-1.5 pt-4.5">
+          <CardLabel>{strings.member.paymentHistory}</CardLabel>
+          {payments.length === 0 ? (
+            <p className="py-4 text-sm text-ink-dim">
+              {strings.member.paymentHistoryEmptyBody}
+            </p>
+          ) : (
+            <ul className="mt-1.5">
+              {payments.map((payment) => (
+                <PaymentHistoryRow key={payment.id} payment={payment} />
+              ))}
+            </ul>
+          )}
         </Card>
 
         <Link href="/install" className="block">

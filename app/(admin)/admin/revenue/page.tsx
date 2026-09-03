@@ -63,7 +63,7 @@ export default async function AdminRevenuePage() {
       <div className="mt-3.5 flex flex-col items-start gap-3.5 xl:flex-row">
         <div className="w-full min-w-0 overflow-hidden rounded-lg border border-border bg-surface-raised xl:flex-1">
           <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-            <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+            <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
               {strings.admin.revenue.paymentsIn(
                 new Intl.DateTimeFormat("en-IN", { month: "long" }).format(new Date()),
               )}
@@ -81,7 +81,7 @@ export default async function AdminRevenuePage() {
             />
           ) : (
             <>
-              <div className="hidden grid-cols-[0.9fr_1.3fr_1fr_0.9fr_0.8fr_0.8fr] gap-3.5 border-b border-border px-5 py-3 font-body text-[0.625rem] font-medium tracking-wider text-ink-dim lg:grid">
+              <div className="hidden grid-cols-[0.9fr_1.3fr_1fr_0.9fr_0.8fr_0.8fr] gap-3.5 border-b border-border px-5 py-3 font-body text-label font-semibold tracking-label uppercase text-ink-dim lg:grid">
                 <span>{strings.admin.revenue.colDate}</span>
                 <span>{strings.admin.revenue.colMember}</span>
                 <span>{strings.admin.revenue.colPlan}</span>
@@ -143,7 +143,7 @@ export default async function AdminRevenuePage() {
         </div>
 
         <div className="w-full flex-none rounded-lg border border-border bg-surface-raised p-5 xl:w-75">
-          <p className="mb-5 font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="mb-5 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.revenue.last6}
           </p>
           <RevenueBars months={revenue.months} />

@@ -29,7 +29,7 @@ export function StatTile({
       style={{ animationDelay: `${delayMs}ms` }}
       className="bh-slide rounded-lg border border-border bg-surface-raised p-5"
     >
-      <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+      <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {label}
       </p>
       <p

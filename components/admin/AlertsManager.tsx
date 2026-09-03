@@ -59,7 +59,7 @@ export function AlertsManager({
   return (
     <div className="flex flex-col items-start gap-3.5 lg:flex-row">
       <div className="w-full flex-none rounded-lg border border-border bg-surface-raised p-5 lg:w-105">
-        <p className="mb-4 font-body text-xs font-medium tracking-wide text-ink-dim">
+        <p className="mb-4 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
           {strings.admin.alerts.composeHeading}
         </p>
 
@@ -106,7 +106,7 @@ export function AlertsManager({
       </div>
 
       <div className="min-w-0 w-full flex-1 rounded-lg border border-border bg-surface-raised p-5">
-        <p className="mb-1 font-body text-xs font-medium tracking-wide text-ink-dim">
+        <p className="mb-1 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
           {strings.admin.alerts.sentHeading}
         </p>
 

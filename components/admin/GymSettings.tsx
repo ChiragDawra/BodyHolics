@@ -23,6 +23,7 @@ export type PlanRow = {
   price_paise: number;
   duration_days: number;
   is_active: boolean;
+  benefits: string[];
 };
 
 export type StaffRow = {
@@ -113,7 +114,7 @@ export function GymSettings({
       {/* Opening hours */}
       <div className="rounded-lg border border-border bg-surface-raised p-5">
         <div className="mb-3.5 flex items-center justify-between gap-3">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.settings.hoursHeading}
           </p>
           {saved ? <Badge tone="success">{strings.admin.settings.saved}</Badge> : null}
@@ -187,7 +188,7 @@ export function GymSettings({
         {/* Plans */}
         <div className="rounded-lg border border-border bg-surface-raised p-5">
           <div className="mb-1.5 flex items-center justify-between gap-3">
-            <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+            <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
               {strings.admin.settings.plansHeading}
             </p>
             <button
@@ -269,7 +270,7 @@ export function GymSettings({
 
         {/* Staff */}
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <p className="mb-1.5 font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="mb-1.5 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.settings.staffHeading}
           </p>
 
@@ -296,7 +297,7 @@ export function GymSettings({
 
           {staffCode ? (
             <div className="mt-3.5 border-t border-border-soft pt-3.5">
-              <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+              <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
                 {strings.admin.settings.staffCodeLabel}
               </p>
               <code className="mt-2 block rounded-sm bg-surface px-3 py-2 font-mono text-sm tracking-widest text-ink">
@@ -312,7 +313,7 @@ export function GymSettings({
 
         {/* Join link */}
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <p className="font-body text-xs font-medium tracking-wide text-ink-dim">
+          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.settings.joinHeading}
           </p>
           <p className="mt-2 text-xs leading-relaxed text-ink-dim">
@@ -348,13 +349,20 @@ function PlanForm({
   const [name, setName] = useState(plan?.name ?? "");
   const [rupees, setRupees] = useState(plan ? String(plan.price_paise / 100) : "");
   const [days, setDays] = useState(plan ? String(plan.duration_days) : "30");
+  const [benefits, setBenefits] = useState((plan?.benefits ?? []).join("\n"));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const submit = () => {
     setError(null);
     startTransition(async () => {
-      const payload = { gymId, name, priceRupees: rupees, durationDays: days };
+      const payload = {
+        gymId,
+        name,
+        priceRupees: rupees,
+        durationDays: days,
+        benefits,
+      };
       const result = plan
         ? await updatePlan({ ...payload, planId: plan.id })
         : await createPlan(payload);
@@ -396,6 +404,22 @@ function PlanForm({
             className="h-10 w-full rounded-sm border border-border bg-surface-raised px-3 text-sm text-ink outline-none focus:border-border-strong"
           />
         </div>
+
+        <label className="block">
+          <span className="mb-1.5 block font-body text-label font-semibold tracking-label uppercase text-ink-dim">
+            {strings.admin.settings.planBenefits}
+          </span>
+          <textarea
+            value={benefits}
+            onChange={(e) => setBenefits(e.target.value)}
+            rows={4}
+            placeholder={strings.admin.settings.planBenefitsPlaceholder}
+            className="w-full resize-y rounded-sm border border-border bg-surface-raised px-3 py-2.5 text-sm leading-relaxed text-ink outline-none focus:border-border-strong"
+          />
+          <span className="mt-1.5 block text-xs text-ink-faint">
+            {strings.admin.settings.planBenefitsHint}
+          </span>
+        </label>
 
         {error ? (
           <p role="alert" className="text-xs text-danger">

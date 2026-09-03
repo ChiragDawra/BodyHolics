@@ -79,3 +79,58 @@ export function daysUntil(dateOnly: string, now: Date = new Date()): number {
 export function gymToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: GYM_TIME_ZONE }).format(now);
 }
+
+/** "18 Aug" — short enough to sit under a timeline marker on a phone. */
+export function formatShortDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: GYM_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+  }).format(new Date(iso));
+}
+
+/**
+ * A calendar day as an integer, for subtracting one date from another.
+ *
+ * Parsed at noon UTC so that adding or comparing days can never be thrown off
+ * by an offset change, the same trick `lib/attendance.ts` uses.
+ */
+function dayNumber(dateOnly: string): number {
+  return Math.round(new Date(`${dateOnly}T12:00:00Z`).getTime() / 86_400_000);
+}
+
+export type MembershipSpan = {
+  totalDays: number;
+  elapsedDays: number;
+  daysLeft: number;
+  /** How far through the membership we are, 0-100. */
+  pct: number;
+};
+
+/**
+ * Where today sits between the start and the end of a membership.
+ *
+ * Both member screens were computing this inline, with slightly different
+ * arithmetic — the home screen derived the span from millisecond timestamps
+ * while the countdown came from `daysUntil`, so the bar and the number could
+ * disagree by a day either side of midnight. One function, one answer.
+ */
+export function membershipSpan(
+  startDate: string,
+  endDate: string,
+  now: Date = new Date(),
+): MembershipSpan {
+  const start = dayNumber(startDate);
+  const end = dayNumber(endDate);
+  const today = dayNumber(gymToday(now));
+
+  const totalDays = Math.max(1, end - start);
+  const elapsedDays = Math.min(totalDays, Math.max(0, today - start));
+
+  return {
+    totalDays,
+    elapsedDays,
+    daysLeft: Math.max(0, end - today),
+    pct: Math.round((elapsedDays / totalDays) * 100),
+  };
+}
