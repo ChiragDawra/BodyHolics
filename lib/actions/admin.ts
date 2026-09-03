@@ -26,6 +26,20 @@ const DENIED: ActionResult = {
   message: strings.admin.notStaffBody,
 };
 
+/**
+ * Postgres reports an UPDATE that RLS filtered down to nothing as a *success*
+ * that touched zero rows, so `error` is null and the caller believes it wrote.
+ * That is exactly how the gym open/closed and crowd toggles appeared to work
+ * for weeks while never changing the row (see Phase 8 in DECISIONS.md).
+ *
+ * Every gym write therefore asks for the updated rows back and treats an
+ * empty result as the failure it is.
+ */
+const NOT_WRITTEN: ActionResult = {
+  ok: false,
+  message: strings.admin.writeRejectedBody,
+};
+
 async function guard() {
   return await isStaff();
 }
@@ -275,12 +289,14 @@ export async function updateHours(input: unknown): Promise<ActionResult> {
   if (!(await guard())) return DENIED;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("gyms")
     .update({ weekly_hours: parsed.data.weeklyHours })
-    .eq("id", parsed.data.gymId);
+    .eq("id", parsed.data.gymId)
+    .select("id");
 
   if (error) return FAILED;
+  if (!data || data.length === 0) return NOT_WRITTEN;
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
@@ -297,12 +313,14 @@ export async function setOpenOverride(input: unknown): Promise<ActionResult> {
   if (!(await guard())) return DENIED;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("gyms")
     .update({ is_open_override: parsed.data.isOpen })
-    .eq("id", parsed.data.gymId);
+    .eq("id", parsed.data.gymId)
+    .select("id");
 
   if (error) return FAILED;
+  if (!data || data.length === 0) return NOT_WRITTEN;
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
@@ -322,12 +340,14 @@ export async function setCrowdLevel(input: unknown): Promise<ActionResult> {
   if (!(await guard())) return DENIED;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("gyms")
     .update({ crowd_level: parsed.data.level, crowd_updated_at: new Date().toISOString() })
-    .eq("id", parsed.data.gymId);
+    .eq("id", parsed.data.gymId)
+    .select("id");
 
   if (error) return FAILED;
+  if (!data || data.length === 0) return NOT_WRITTEN;
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin");

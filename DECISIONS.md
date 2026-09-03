@@ -524,3 +524,96 @@ have not been seen rendered. Both need a signed-in session — the admin needs
 `chiragdawra46@gmail.com` specifically — and Google sign-in cannot be completed
 from here. The queries, actions, and RLS are verified at the database layer;
 the rendered pages are not.
+
+---
+
+## Phase 8 — Realtime sync for gym open/closed and crowd
+
+### D59. The bug was RLS, not the client. `gyms` had no UPDATE policy at all
+
+`20260901000200_gyms.sql` created a select policy and nothing else, with a
+comment saying writes "go through staff RLS (added with the staff table)".
+They never were. `20260901000400_staff_and_profiles.sql` adds policies to
+`staff` and `profiles` and never comes back to `gyms`.
+
+So every staff write — `is_open_override`, `crowd_level`, `weekly_hours` —
+matched zero rows. This is the dangerous shape of an RLS failure: Postgres
+reports an UPDATE that RLS filtered down to nothing as a *successful* update
+of no rows, so supabase-js returns `error: null` and the server action returns
+`{ ok: true }`. The optimistic UI flipped, the action reported success, the row
+never changed, and the next read put it back. That is exactly the reported
+symptom — "reverts even after refresh".
+
+Confirmed before the fix by reading the row directly over the REST API with
+the anon key: `crowd_updated_at` was still `2026-08-31T19:10:41Z`, the seed
+timestamp, after the owner had used the toggles repeatedly.
+
+`20260903000100_gyms_staff_write_and_realtime.sql` adds
+`staff update their own gym` using `is_staff(id)`.
+
+### D60. Every gym write now asks for its rows back
+
+A policy fixes today's bug. It does not stop the next one from being silent.
+`setOpenOverride`, `setCrowdLevel`, and `updateHours` now append `.select("id")`
+and treat an empty result as a failure (`NOT_WRITTEN`), so an RLS rejection can
+never again be indistinguishable from a successful write.
+
+`GymStatusControls` correspondingly rolls its optimistic state back and shows
+the message when an action fails. Optimism is only honest if failure is visible.
+
+### D61. One realtime provider per screen, not one subscription per tile
+
+`components/member/GymLive.tsx` holds a single `postgres_changes` subscription
+on the gym row and hands the result to `LiveHeroStatus` and `LiveCrowdMeter`
+through context. Two components each subscribing to `gyms` would open two
+channels for the same row.
+
+`gyms` had to be added to the `supabase_realtime` publication — realtime only
+streams tables that are in it. Realtime applies RLS to what it streams, and
+`gyms` is world-readable, so the same provider works signed in on `/app` and
+signed out on the landing page.
+
+### D62. `initial` is compared by value, not used as an effect dependency
+
+The provider prefers the last realtime payload over the server render, so a
+change missed while the socket was disconnected would otherwise be masked
+forever by a stale event. `initial` is a fresh object every render and cannot
+be a dependency, so it is compared as a JSON key during render (React's
+documented "adjust state when props change" pattern) and a genuinely different
+server render clears the live row.
+
+A one-minute clock tick also re-resolves the open state, because "is the gym
+open" depends on `now()` as well as on the row — the gym closes at 10pm whether
+or not anyone touched a control.
+
+### D63. A staff row was added for the test account
+
+Verification needed a staff session and the only browser session available was
+`dawrachirag0815@gmail.com`, a member. With the owner's agreement that account
+was added to `public.staff` as `role = 'staff'` by a one-off query rather than
+a migration, so it is not baked into the repo.
+
+**Remove it before this is real:**
+
+```sql
+delete from public.staff where id = '5420f88c-7b3d-4f2e-9285-2853b012181d';
+```
+
+### Verified
+
+- **RLS, by impersonating a JWT in SQL** (`set local role authenticated` with
+  `request.jwt.claims`): staff UPDATE on `gyms` matched 1 row, plain-member
+  UPDATE matched 0. The same harness with a deliberately inverted expectation
+  was run as a control and did raise, so the passing run was not a no-op.
+- **`gyms` is in the `supabase_realtime` publication** — confirmed from
+  `pg_publication_tables`.
+- **The write persists** — clicked "Force closed" in `/admin`, then read the
+  row over REST: `is_open_override` became `false`. The first time this app has
+  ever written that column.
+- **The member screen updates live with zero refresh** — member `/app` in one
+  tab, `/admin` in another. "Force closed" flipped the member hero from OPEN to
+  CLOSED, including the accent edge going green to red, with no reload and no
+  navigation. Setting crowd to "Crowded" flipped the member tile to "Crowded",
+  three of four segments lit, caption changed to "Most stations are busy."
+- **Restored** — "Follow hours" and "Not crowded" returned the row to
+  `is_open_override: null`, `crowd_level: not_crowded`, confirmed over REST.

@@ -5,6 +5,7 @@ import {
   resolveOpenState,
   type CrowdLevel,
   type OpenState,
+  type WeeklyHours,
 } from "@/lib/gym";
 import { gymTodayKey } from "@/lib/attendance";
 
@@ -30,6 +31,10 @@ export type MemberSnapshot = {
   };
   gymName: string;
   openState: OpenState;
+  /* The raw schedule fields too, so the client can re-resolve open/closed
+     from a realtime payload without another round trip. */
+  weeklyHours: WeeklyHours;
+  isOpenOverride: boolean | null;
   crowdLevel: CrowdLevel;
   crowdUpdatedAt: string;
   membership: MembershipRow | null;
@@ -109,14 +114,15 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
   const gym = gymResult.data;
   const quiet = quietResult.data as { hour?: number } | null;
   const membershipRow = membershipResult.data;
+  const weeklyHours = parseWeeklyHours(gym?.weekly_hours);
+  const isOpenOverride = gym?.is_open_override ?? null;
 
   return {
     profile,
     gymName: gym?.name ?? "",
-    openState: resolveOpenState(
-      parseWeeklyHours(gym?.weekly_hours),
-      gym?.is_open_override ?? null,
-    ),
+    openState: resolveOpenState(weeklyHours, isOpenOverride),
+    weeklyHours,
+    isOpenOverride,
     crowdLevel: gym?.crowd_level ?? "not_crowded",
     crowdUpdatedAt: gym?.crowd_updated_at ?? new Date().toISOString(),
     membership: membershipRow

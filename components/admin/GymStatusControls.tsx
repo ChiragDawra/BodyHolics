@@ -11,8 +11,14 @@ import { cn } from "@/lib/cn";
  *
  * Both write optimistically: the desk taps "Force closed" and the word flips
  * immediately, because waiting on a round trip in front of a queue is what
- * makes staff stop using a tool. The server action revalidates, so a failed
- * write corrects itself on the next render rather than silently sticking.
+ * makes staff stop using a tool.
+ *
+ * "Optimistic" only works if a failure is visible. Until Phase 8 these
+ * writes were being rejected by RLS, which Postgres reports as a successful
+ * update of zero rows, so the action returned ok and the flip stuck on screen
+ * while the database never changed. Both handlers now roll the local state
+ * back and surface the message when the action fails, so a silent write can
+ * never look like a successful one again.
  */
 export function GymStatusControls({
   gymId,
@@ -28,22 +34,36 @@ export function GymStatusControls({
   const [isOpen, setIsOpen] = useState(openState.isOpen);
   const [overridden, setOverridden] = useState(openState.overridden);
   const [crowd, setCrowd] = useState(crowdLevel);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const applyOverride = (value: boolean | null) => {
+    const previous = { isOpen, overridden };
+    setError(null);
     setOverridden(value !== null);
-    if (value !== null) setIsOpen(value);
-    else setIsOpen(openState.isOpen);
+    setIsOpen(value !== null ? value : openState.isOpen);
 
     startTransition(async () => {
-      await setOpenOverride({ gymId, isOpen: value });
+      const result = await setOpenOverride({ gymId, isOpen: value });
+      if (!result.ok) {
+        setIsOpen(previous.isOpen);
+        setOverridden(previous.overridden);
+        setError(result.message);
+      }
     });
   };
 
   const applyCrowd = (level: CrowdLevel) => {
+    const previous = crowd;
+    setError(null);
     setCrowd(level);
+
     startTransition(async () => {
-      await setCrowdLevel({ gymId, level });
+      const result = await setCrowdLevel({ gymId, level });
+      if (!result.ok) {
+        setCrowd(previous);
+        setError(result.message);
+      }
     });
   };
 
@@ -140,6 +160,12 @@ export function GymStatusControls({
           })}
         </div>
       </div>
+
+      {error ? (
+        <p role="alert" className="pt-2 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

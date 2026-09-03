@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { MemberHeader } from "@/components/member/MemberHeader";
 import { MemberTabBar } from "@/components/member/MemberTabBar";
 import { AlertsBell } from "@/components/member/AlertsBell";
-import { HeroStatus } from "@/components/member/HeroStatus";
-import { CrowdMeter } from "@/components/member/CrowdMeter";
+import {
+  GymLiveProvider,
+  LiveCrowdMeter,
+  LiveHeroStatus,
+} from "@/components/member/GymLive";
 import { StreakCard } from "@/components/member/StreakCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -80,30 +83,39 @@ export default async function MemberHomePage() {
       />
 
       <div className="flex flex-col gap-2.5 px-4 pb-32">
-        <HeroStatus state={snapshot.openState} />
+        <GymLiveProvider
+          gymId={snapshot.profile.gym_id}
+          initial={{
+            weeklyHours: snapshot.weeklyHours,
+            isOpenOverride: snapshot.isOpenOverride,
+            crowdLevel: snapshot.crowdLevel,
+          }}
+        >
+          <LiveHeroStatus />
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <Card
-            className="bh-rise p-4"
-            /* delay so the tiles arrive in reading order */
-            as="div"
-          >
-            <CrowdMeter level={snapshot.crowdLevel} />
-          </Card>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Card
+              className="bh-rise p-4"
+              /* delay so the tiles arrive in reading order */
+              as="div"
+            >
+              <LiveCrowdMeter />
+            </Card>
 
-          <Card className="bh-rise p-4">
-            <CardLabel>{strings.member.rightNow}</CardLabel>
-            <p className="mt-1.5 font-display text-4xl leading-none font-bold tracking-tighter text-brand">
-              {snapshot.liveCount}
-            </p>
-            <p className="mt-1.5 text-sm text-ink-muted">
-              {strings.member.inTheGym}
-            </p>
-            <p className="mt-3.5 text-xs leading-snug text-ink-dim">
-              {strings.member.checkedInNotOut}
-            </p>
-          </Card>
-        </div>
+            <Card className="bh-rise p-4">
+              <CardLabel>{strings.member.rightNow}</CardLabel>
+              <p className="mt-1.5 font-display text-4xl leading-none font-bold tracking-tighter text-brand">
+                {snapshot.liveCount}
+              </p>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                {strings.member.inTheGym}
+              </p>
+              <p className="mt-3.5 text-xs leading-snug text-ink-dim">
+                {strings.member.checkedInNotOut}
+              </p>
+            </Card>
+          </div>
+        </GymLiveProvider>
 
         <Card className="bh-rise p-4.5">
           {membership ? (

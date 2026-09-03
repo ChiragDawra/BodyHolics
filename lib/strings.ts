@@ -187,6 +187,8 @@ export const strings = {
     notStaffTitle: "That account is not staff",
     notStaffBody:
       "Ask the owner to add your Google account to the staff list, then sign in again.",
+    writeRejectedBody:
+      "The gym's server refused that change. Sign out and back in, then try again.",
     signOut: "Sign out",
     roleLabel: "Admin",
     live: "Live",

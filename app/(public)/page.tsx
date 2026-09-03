@@ -3,14 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
-import { HeroStatus } from "@/components/member/HeroStatus";
-import { CrowdMeter } from "@/components/member/CrowdMeter";
 import {
-  DAY_LABELS,
-  parseWeeklyHours,
-  resolveOpenState,
-  formatTime,
-} from "@/lib/gym";
+  GymLiveProvider,
+  LiveCrowdMeter,
+  LiveHeroStatus,
+} from "@/components/member/GymLive";
+import { DAY_LABELS, parseWeeklyHours, formatTime } from "@/lib/gym";
 import { homeFor } from "@/lib/config";
 import { strings } from "@/lib/strings";
 
@@ -22,15 +20,13 @@ export default async function LandingPage() {
   const [{ data: gym }, user] = await Promise.all([
     supabase
       .from("gyms")
-      .select("name, join_code, weekly_hours, is_open_override, crowd_level")
+      .select("id, name, join_code, weekly_hours, is_open_override, crowd_level")
       .limit(1)
       .maybeSingle(),
     getUser(),
   ]);
 
   const hours = parseWeeklyHours(gym?.weekly_hours);
-  const openState = resolveOpenState(hours, gym?.is_open_override ?? null);
-  const crowd = gym?.crowd_level ?? "not_crowded";
 
   const weekday = hours.mon;
   const weekend = hours.sat;
@@ -45,15 +41,26 @@ export default async function LandingPage() {
         <p className="text-ink-muted">{strings.landing.lede}</p>
       </div>
 
-      <div className="mt-7">
-        <HeroStatus state={openState} />
-      </div>
+      {gym ? (
+        <GymLiveProvider
+          gymId={gym.id}
+          initial={{
+            weeklyHours: hours,
+            isOpenOverride: gym.is_open_override,
+            crowdLevel: gym.crowd_level,
+          }}
+        >
+          <div className="mt-7">
+            <LiveHeroStatus />
+          </div>
 
-      <div className="mt-2.5">
-        <Card className="p-4">
-          <CrowdMeter level={crowd} />
-        </Card>
-      </div>
+          <div className="mt-2.5">
+            <Card className="p-4">
+              <LiveCrowdMeter />
+            </Card>
+          </div>
+        </GymLiveProvider>
+      ) : null}
 
       <div className="mt-6">
         <Link
