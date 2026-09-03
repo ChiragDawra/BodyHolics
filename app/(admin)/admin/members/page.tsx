@@ -44,6 +44,7 @@ export default async function AdminMembersPage() {
         price_paise: m.price_paise,
       })),
       days: last30Days(detail.attendance),
+      discount: detail.discount,
       /**
        * The list price travels alongside the payable one so the desk can see
        * when a member is being charged less than the sticker. Neither is the

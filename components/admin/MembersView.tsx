@@ -7,7 +7,19 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
 import { MiniGrid } from "@/components/member/ActivityGrid";
 import { CloseIcon, PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
-import { addMemberManually, recordCashPayment } from "@/lib/actions/admin";
+import {
+  addMemberDiscount,
+  addMemberManually,
+  recordCashPayment,
+  removeMemberDiscount,
+} from "@/lib/actions/admin";
+import {
+  DISCOUNT_TERMS,
+  FLAT_STEPS_RUPEES,
+  PERCENT_STEPS,
+  type DiscountTerm,
+} from "@/lib/discounts";
+import type { ActiveDiscount } from "@/lib/queries/admin";
 import type { MemberListRow } from "@/lib/queries/admin";
 import { formatPhone } from "@/lib/gym";
 import { daysUntil, formatDay } from "@/lib/format";
@@ -39,6 +51,8 @@ export type MemberDetail = {
    * discount, so a list fetched for the page would be the wrong list.
    */
   plans: OfferablePlan[];
+  /** The discount the pricing function would apply, if any. */
+  discount: ActiveDiscount | null;
 };
 
 function isActive(m: MemberListRow): boolean {
@@ -94,6 +108,16 @@ export function MembersView({
     setSelected(member);
     setDetail(null);
     setDetail(await loadDetail(member.id));
+  };
+
+  /**
+   * The panel's detail is fetched on demand for the selected member, so a
+   * server action's `revalidatePath` re-renders the list behind it but leaves
+   * this stale. Anything that writes calls this afterwards.
+   */
+  const reload = async () => {
+    if (!selected) return;
+    setDetail(await loadDetail(selected.id));
   };
 
   const close = () => {
@@ -235,7 +259,13 @@ export function MembersView({
           {/* Desktop: detail as a side panel. */}
           {selected ? (
             <div className="bh-slide hidden w-85 flex-none rounded-lg border border-border bg-surface-raised p-5 lg:block">
-              <DetailBody member={selected} detail={detail} onClose={close} />
+              <DetailBody
+                gymId={gymId}
+                member={selected}
+                detail={detail}
+                onChanged={reload}
+                onClose={close}
+              />
             </div>
           ) : (
             <p className="hidden w-85 flex-none pt-2 text-xs text-ink-faint lg:block">
@@ -254,8 +284,10 @@ export function MembersView({
         >
           {selected ? (
             <DetailBody
+              gymId={gymId}
               member={selected}
               detail={detail}
+              onChanged={reload}
               onClose={close}
               hideClose
             />
@@ -279,13 +311,17 @@ export function MembersView({
 }
 
 function DetailBody({
+  gymId,
   member,
   detail,
+  onChanged,
   onClose,
   hideClose = false,
 }: {
+  gymId: string;
   member: MemberListRow;
   detail: MemberDetail | null;
+  onChanged: () => Promise<void>;
   onClose: () => void;
   hideClose?: boolean;
 }) {
@@ -393,8 +429,182 @@ function DetailBody({
         <MiniGrid days={detail.days} />
       )}
 
-      {detail ? <CashPayment member={member} plans={detail.plans} /> : null}
+      {detail ? (
+        <>
+          <MemberDiscount
+            gymId={gymId}
+            member={member}
+            discount={detail.discount}
+            onChanged={onChanged}
+          />
+          <CashPayment
+            member={member}
+            plans={detail.plans}
+            onChanged={onChanged}
+          />
+        </>
+      ) : null}
     </>
+  );
+}
+
+/**
+ * A price that is lower for this member than the list price.
+ *
+ * One discount at a time: adding a second would be ambiguous at the desk and
+ * the pricing function only ever applies the newest, so the form is replaced
+ * by the live discount once one exists, with a way to remove it.
+ */
+function MemberDiscount({
+  gymId,
+  member,
+  discount,
+  onChanged,
+}: {
+  gymId: string;
+  member: MemberListRow;
+  discount: ActiveDiscount | null;
+  onChanged: () => Promise<void>;
+}) {
+  const [type, setType] = useState<"percent" | "flat">("percent");
+  const [value, setValue] = useState("20");
+  const [term, setTerm] = useState<DiscountTerm>("3m");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const save = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await addMemberDiscount({
+        gymId,
+        memberId: member.id,
+        discountType: type,
+        value,
+        term,
+      });
+
+      if (result.ok) {
+        setOpen(false);
+        await onChanged();
+      } else {
+        setError(result.message);
+      }
+    });
+  };
+
+  const remove = (id: string) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await removeMemberDiscount(id);
+      if (result.ok) await onChanged();
+      else setError(result.message);
+    });
+  };
+
+  return (
+    <div className="mt-5 border-t border-border-soft pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
+          {strings.admin.members.discountHeading}
+        </p>
+        {discount ? null : (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="font-body text-xs font-medium text-brand hover:text-brand-hover"
+          >
+            {strings.admin.members.addDiscount}
+          </button>
+        )}
+      </div>
+
+      {discount ? (
+        <div className="mt-2.5 flex items-center justify-between gap-3">
+          <Badge tone="brand">
+            {strings.admin.members.discountActive(
+              discount.discount_type === "percent"
+                ? `${discount.value}% off`
+                : `${strings.common.rupees(discount.value)} off`,
+              discount.expires_at === null
+                ? strings.admin.members.discountForever
+                : strings.admin.members.discountUntil(formatDay(discount.expires_at)),
+            )}
+          </Badge>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => remove(discount.id)}
+            className="font-body text-xs font-medium text-ink-dim transition-colors hover:text-danger disabled:opacity-60"
+          >
+            {strings.admin.members.discountRemove}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-1.5 text-xs text-ink-dim">
+          {strings.admin.members.discountNone}
+        </p>
+      )}
+
+      {open && !discount ? (
+        <div className="mt-3 flex flex-col gap-2.5 rounded-md border border-border bg-surface p-3.5">
+          <select
+            value={type}
+            aria-label={strings.admin.members.discountType}
+            onChange={(e) => {
+              const next = e.target.value as "percent" | "flat";
+              setType(next);
+              setValue(next === "percent" ? "20" : "200");
+            }}
+            className="h-10 w-full rounded-sm border border-border bg-surface-raised px-3 text-sm text-ink outline-none focus:border-border-strong"
+          >
+            <option value="percent">{strings.admin.members.discountPercent}</option>
+            <option value="flat">{strings.admin.members.discountFlat}</option>
+          </select>
+
+          <select
+            value={value}
+            aria-label={strings.admin.members.discountValue}
+            onChange={(e) => setValue(e.target.value)}
+            className="h-10 w-full rounded-sm border border-border bg-surface-raised px-3 text-sm text-ink outline-none focus:border-border-strong"
+          >
+            {(type === "percent"
+              ? PERCENT_STEPS
+              : FLAT_STEPS_RUPEES
+            ).map((n) => (
+              <option key={n} value={n}>
+                {type === "percent" ? `${n}%` : strings.common.rupees(n * 100)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={term}
+            aria-label={strings.admin.members.discountTerm}
+            onChange={(e) => setTerm(e.target.value as DiscountTerm)}
+            className="h-10 w-full rounded-sm border border-border bg-surface-raised px-3 text-sm text-ink outline-none focus:border-border-strong"
+          >
+            {DISCOUNT_TERMS.map((t) => (
+              <option key={t} value={t}>
+                {strings.admin.members.discountTerms[t]}
+              </option>
+            ))}
+          </select>
+
+          <Button size="sm" disabled={pending} onClick={save}>
+            {pending
+              ? strings.admin.members.discountSaving
+              : strings.admin.members.discountSave}
+          </Button>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="mt-2.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -410,9 +620,11 @@ function DetailBody({
 function CashPayment({
   member,
   plans,
+  onChanged,
 }: {
   member: MemberListRow;
   plans: OfferablePlan[];
+  onChanged: () => Promise<void>;
 }) {
   const [planId, setPlanId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -439,6 +651,7 @@ function CashPayment({
       if (result.ok) {
         setDone(true);
         setPlanId("");
+        await onChanged();
       } else {
         setError(result.message);
       }

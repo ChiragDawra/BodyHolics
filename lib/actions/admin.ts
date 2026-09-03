@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { CROWD_LEVELS } from "@/lib/gym";
+import { DISCOUNT_TERMS, DISCOUNT_TERM_MONTHS } from "@/lib/discounts";
 import { isStaff } from "@/lib/supabase/auth";
 import { strings } from "@/lib/strings";
 
@@ -484,6 +485,93 @@ export async function recordCashPayment(input: unknown): Promise<ActionResult> {
   revalidatePath("/admin/members");
   revalidatePath("/admin/revenue");
   revalidatePath("/admin");
+  revalidatePath("/app");
+  revalidatePath("/app/me");
+  return { ok: true };
+}
+
+/* --------------------------------------------------------------- discounts */
+
+export async function addMemberDiscount(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      gymId: z.string().uuid(),
+      memberId: z.string().uuid(),
+      discountType: z.enum(["percent", "flat"]),
+      /* Percentage points, or whole rupees for a flat discount. */
+      value: z.coerce.number().int().positive(),
+      term: z.enum(DISCOUNT_TERMS),
+    })
+    .safeParse(input);
+
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  // Rupees in the form, paise in the column, matching every other amount.
+  const value =
+    parsed.data.discountType === "flat"
+      ? parsed.data.value * 100
+      : parsed.data.value;
+
+  // The database CHECK enforces these too; failing here gives a message
+  // instead of a constraint violation.
+  const inRange =
+    parsed.data.discountType === "percent"
+      ? value >= 1 && value <= 40
+      : value >= 10_000 && value <= 50_000;
+
+  if (!inRange) {
+    return { ok: false, message: strings.admin.members.discountOutOfRange };
+  }
+
+  const expiresAt =
+    parsed.data.term === "never"
+      ? null
+      : (() => {
+          const d = new Date();
+          d.setMonth(
+            d.getMonth() +
+              DISCOUNT_TERM_MONTHS[parsed.data.term as "1m" | "3m" | "6m"],
+          );
+          return d.toISOString();
+        })();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("member_discounts").insert({
+    gym_id: parsed.data.gymId,
+    member_id: parsed.data.memberId,
+    discount_type: parsed.data.discountType,
+    value,
+    expires_at: expiresAt,
+    created_by: user?.id ?? null,
+  });
+
+  if (error) return FAILED;
+
+  revalidatePath("/admin/members");
+  revalidatePath("/app");
+  revalidatePath("/app/me");
+  return { ok: true };
+}
+
+export async function removeMemberDiscount(discountId: unknown): Promise<ActionResult> {
+  const parsed = z.string().uuid().safeParse(discountId);
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("member_discounts")
+    .delete()
+    .eq("id", parsed.data);
+
+  if (error) return FAILED;
+
+  revalidatePath("/admin/members");
   revalidatePath("/app");
   revalidatePath("/app/me");
   return { ok: true };

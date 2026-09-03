@@ -105,11 +105,19 @@ export async function getMembers(gymId: string): Promise<MemberListRow[]> {
   });
 }
 
-/** Membership history and 30-day attendance for the detail panel. */
+export type ActiveDiscount = {
+  id: string;
+  discount_type: "percent" | "flat";
+  value: number;
+  expires_at: string | null;
+};
+
+/** Membership history, 30-day attendance, and any live discount. */
 export async function getMemberDetail(profileId: string) {
   const supabase = await createClient();
+  const now = new Date().toISOString();
 
-  const [membershipsResult, attendanceResult] = await Promise.all([
+  const [membershipsResult, attendanceResult, discountResult] = await Promise.all([
     supabase
       .from("memberships")
       .select("id, start_date, end_date, status, plans(name, price_paise)")
@@ -122,6 +130,16 @@ export async function getMemberDetail(profileId: string) {
       .eq("profile_id", profileId)
       .gte("checked_in_at", new Date(Date.now() - 31 * 86_400_000).toISOString())
       .order("checked_in_at", { ascending: false }),
+    /* The one the pricing function would pick: live now, newest first. */
+    supabase
+      .from("member_discounts")
+      .select("id, discount_type, value, expires_at")
+      .eq("member_id", profileId)
+      .lte("starts_at", now)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   return {
@@ -134,6 +152,7 @@ export async function getMemberDetail(profileId: string) {
       price_paise: m.plans?.price_paise ?? null,
     })),
     attendance: attendanceResult.data ?? [],
+    discount: (discountResult.data ?? null) as ActiveDiscount | null,
   };
 }
 

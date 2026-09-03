@@ -1076,3 +1076,74 @@ It moved into `loadDetail(profileId)`, which already runs per selected member.
 - This also closes Phase 11's remaining item — the countdown was exercised
   against a member *with* an active membership, not just the empty state.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Phase 13 — Per-member discounts
+
+### D96. One column, two units, held honest by a CHECK
+
+`value` is percentage points when `discount_type = 'percent'` and paise when
+it is `'flat'`. The alternative is two columns of which one is always null.
+The CHECK constraint carries both the discriminated union and the agreed
+ranges — 1–40 percent, or ₹100–₹500 — so a row outside them cannot exist even
+if the action is bypassed.
+
+### D97. `member_discounts` carries `gym_id` although the brief did not list it
+
+The RLS policy needs to ask "is the caller staff at this gym", and `member_id`
+alone would force a policy whose USING clause selects from `profiles`. That is
+the exact shape that produced the infinite recursion in D72, and every other
+table in this schema carries `gym_id` for the same reason.
+
+### D98. The discount is applied in one place, and it already existed
+
+Phase 12 introduced `discounted_price()` as the identity function precisely so
+this phase would be a body swap. Replacing it means the member's plan list,
+the admin's dropdown, and `record_cash_payment` all started honouring
+discounts at once, with no other change.
+
+Clamped at zero, so a ₹500 flat discount on a ₹100 plan charges nothing rather
+than minus ₹400. Most recently created wins if several are live: stacking two
+discounts is not something anyone at a desk means to do.
+
+### D99. Bug the gate did not catch: a const exported from a `"use server"` file
+
+`DISCOUNT_TERMS` was exported from `lib/actions/admin.ts`. `tsc`, `eslint`,
+and `next build` all passed. The feature was broken:
+
+```
+Error: A "use server" file can only export async functions, found object.
+```
+
+A `"use server"` module may export only async functions, and the failure is at
+runtime when the actions module loads — it took down every action on the page,
+so the member detail panel hung on "Loading". Constants moved to
+`lib/discounts.ts`.
+
+This is the clearest argument in this whole run for exercising a feature
+rather than trusting a green build.
+
+### D100. The detail panel refreshes itself after a write
+
+The panel's contents are fetched on demand for the selected member, so a
+server action's `revalidatePath` re-rendered the list behind it and left the
+panel stale — adding a discount showed "Paying the list price" until the row
+was clicked again. Every write in the panel now calls back into `loadDetail`.
+
+### Verified
+
+- **The row**: 25% off, expiring 2026-12-03, exactly three months from today,
+  written by the admin form.
+- **The maths, in the database**: `discounted_price` returns 90000 paise for a
+  ₹1,200 plan and 225000 for a ₹3,000 one.
+- **The admin's dropdown**: "Monthly · ₹900 (₹1,200)", "Quarterly · ₹2,250
+  (₹3,000)", "Half-year · ₹4,500 (₹6,000)".
+- **The member's own plan list**: ₹1,200 struck through beside ₹900, and the
+  same for the other two plans.
+- **The amount actually charged**: took the payment again through the admin UI
+  and the database recorded `amount_paise` = ₹900 against a plan whose
+  `price_paise` is ₹1,200. The discount reaches the charge, not just the
+  display.
+- **The badge**: "25% OFF · UNTIL 3 DECEMBER" with a Remove control.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

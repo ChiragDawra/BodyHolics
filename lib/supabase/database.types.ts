@@ -287,6 +287,57 @@ export type Database = {
         }
         Relationships: []
       }
+      member_discounts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discount_type: Database["public"]["Enums"]["discount_type"]
+          expires_at: string | null
+          gym_id: string
+          id: string
+          member_id: string
+          starts_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discount_type: Database["public"]["Enums"]["discount_type"]
+          expires_at?: string | null
+          gym_id: string
+          id?: string
+          member_id: string
+          starts_at?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discount_type?: Database["public"]["Enums"]["discount_type"]
+          expires_at?: string | null
+          gym_id?: string
+          id?: string
+          member_id?: string
+          starts_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_discounts_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_discounts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           created_at: string
@@ -663,6 +714,7 @@ export type Database = {
     Enums: {
       attendance_method: "manual" | "qr"
       crowd_level: "not_crowded" | "moderate" | "crowded" | "very_crowded"
+      discount_type: "percent" | "flat"
       membership_status: "active" | "expired" | "cancelled"
       payment_method: "cash" | "upi" | "card" | "other"
       payment_status: "collected" | "pending" | "refunded"
@@ -799,6 +851,7 @@ export const Constants = {
     Enums: {
       attendance_method: ["manual", "qr"],
       crowd_level: ["not_crowded", "moderate", "crowded", "very_crowded"],
+      discount_type: ["percent", "flat"],
       membership_status: ["active", "expired", "cancelled"],
       payment_method: ["cash", "upi", "card", "other"],
       payment_status: ["collected", "pending", "refunded"],
