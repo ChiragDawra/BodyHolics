@@ -51,6 +51,8 @@ export default async function AdminDashboardPage() {
           ((revenue.thisMonthPaise - revenue.lastMonthPaise) / revenue.lastMonthPaise) * 100,
         );
 
+  // Two different tiles, two different comparisons. They used to share one.
+  const activeDelta = stats.activeMembers - stats.activeLastMonth;
   const newDelta = stats.newThisMonth - stats.newLastMonth;
 
   return (
@@ -90,8 +92,8 @@ export default async function AdminDashboardPage() {
           tone="brand"
           delayMs={0}
           note={
-            <Delta positive={newDelta > 0}>
-              {strings.admin.dashboard.vsLastMonth(newDelta)}
+            <Delta positive={activeDelta > 0}>
+              {strings.admin.dashboard.vsLastMonth(activeDelta)}
             </Delta>
           }
         />

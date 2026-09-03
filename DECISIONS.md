@@ -934,3 +934,61 @@ be seen.
   time today" still says "Not enough visits yet to call it", which is the
   honest answer from one visit.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Phase 11 — Audit: no static data anywhere
+
+### D87. Both dashboard stat tiles were showing the same delta, and one was wrong
+
+"Active members" and "New this month" each rendered
+`vsLastMonth(newThisMonth - newLastMonth)`. On the second tile that is the
+right number. On the first it is the change in *registrations* under a label
+that says active memberships — a number that does not mean what it says.
+
+`activeLastMonth` existed but was computed as
+`activeMembers - newThisMonth`, which is not that figure and not any figure:
+it assumes every new member started a membership and that nothing expired.
+
+It is now a real query — memberships whose span covered the date one month
+ago, on dates alone with no status filter, because a membership that has since
+expired was still live on that date and that is the question being asked.
+
+The old figure was 7 and the real one is 8. Close enough to look right, which
+is how it survived.
+
+### D88. The Alerts tab was loading every member to count them
+
+`/admin/alerts` needs one number — how many people a notice reaches — and was
+calling `getMembers()`, which fetches every profile, joins the whole membership
+table, and sums pending payments, so that `.length` could be read off it.
+Replaced with `getMemberCount()`, a `head: true` count.
+
+This is the "every tab owns only its own data" rule: the Alerts page has no
+business holding member dues.
+
+### Audit results
+
+- **Activity grid**: real. Built from `attendance` rows by `monthGrids()`, and
+  the empty state is the real one — the account used for testing showed "No
+  visits yet" before its first check-in and "1 visit since 3 September" after.
+  There is no sample grid anywhere in the code.
+- **Streak**: real. `computeStreak()` over distinct check-in days; went 0 to 1
+  on the first real check-in.
+- **Membership countdown**: reads `memberships` joined to `plans`, with the
+  empty state shown only when the query returns nothing. Exercised against a
+  member *with* an active row in Phase 12, where the cash payment creates one.
+- **Admin stat cards**: every figure checked against SQL and matching —
+  active members 18, new this month 11, collected in September ₹0, pending
+  dues ₹11,200 across 2 members, 12 registrations this week, 1 check-in today.
+- **Revenue chart**: real. The six monthly buckets sum to ₹2,48,400, matching
+  the "collected" line on the dashboard, and the per-month figures match
+  `sum(amount_paise) group by month` exactly (Apr 55,800 · May 51,300 ·
+  Jun 43,200 · Jul 72,000 · Aug 26,100 · Sept 0).
+- **Gym open/close and crowd controls**: `GymStatusControls` is referenced in
+  exactly two places, `/admin` and `GymSettings`. No leakage into Members,
+  Revenue, Attendance, or Alerts. The member-side `CrowdMeter` appears only on
+  the member home and the landing page, which is display, not control.
+- **Static data sweep**: no sample, mock, dummy, or placeholder datasets in
+  `app/`, `components/`, or `lib/`. The only module-level literal arrays are
+  the three navigation definitions, which is what they should be.

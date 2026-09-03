@@ -22,6 +22,22 @@ export async function getStaffGym() {
   return data;
 }
 
+/**
+ * Just the number of members. The Alerts tab wants a count to say how many
+ * people a notice will reach; it was calling getMembers() and pulling every
+ * profile, membership, and pending payment in the gym to call `.length` on it.
+ */
+export async function getMemberCount(gymId: string): Promise<number> {
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("gym_id", gymId);
+
+  return count ?? 0;
+}
+
 export type MemberListRow = {
   id: string;
   full_name: string | null;
@@ -340,8 +356,14 @@ export async function getDashboardStats(gymId: string): Promise<DashboardStats> 
     return d.toISOString().slice(0, 10);
   })();
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const monthAgo = (() => {
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
 
-  const [active, newThis, newLast, todayCount, live, recent, week] = await Promise.all([
+  const [active, newThis, newLast, todayCount, live, recent, week, activeThen] =
+    await Promise.all([
     supabase
       .from("memberships")
       .select("id", { count: "exact", head: true })
@@ -381,11 +403,25 @@ export async function getDashboardStats(gymId: string): Promise<DashboardStats> 
       .select("id", { count: "exact", head: true })
       .eq("gym_id", gymId)
       .gte("created_at", weekAgo),
+    /**
+     * How many memberships were valid a month ago.
+     *
+     * Dates only, no status filter: a membership that has since expired was
+     * still a live membership on that date, and that is the question. This
+     * used to be `activeMembers - newThisMonth`, which is not that number and
+     * not any number — see D87.
+     */
+    supabase
+      .from("memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("gym_id", gymId)
+      .lte("start_date", monthAgo)
+      .gte("end_date", monthAgo),
   ]);
 
   return {
     activeMembers: active.count ?? 0,
-    activeLastMonth: Math.max(0, (active.count ?? 0) - (newThis.count ?? 0)),
+    activeLastMonth: activeThen.count ?? 0,
     newThisMonth: newThis.count ?? 0,
     newLastMonth: newLast.count ?? 0,
     checkinsToday: todayCount.count ?? 0,
