@@ -10,7 +10,8 @@ import {
   getStaffGym,
   getTodayAttendance,
 } from "@/lib/queries/admin";
-import { parseWeeklyHours, formatTime } from "@/lib/gym";
+import { blocksForDay, formatTime } from "@/lib/gym";
+import { getGymSchedule } from "@/lib/queries/gym";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.admin.nav.more };
@@ -28,16 +29,18 @@ export default async function AdminMorePage() {
   const user = await getUser();
   if (!gym) return null;
 
-  const [revenue, today, alerts, plans, staff] = await Promise.all([
+  const [revenue, today, alerts, plans, staff, schedule] = await Promise.all([
     getRevenueSummary(gym.id),
     getTodayAttendance(gym.id),
     getAlerts(gym.id),
     getPlans(gym.id),
     getStaff(gym.id),
+    getGymSchedule(gym.id),
   ]);
 
-  const hours = parseWeeklyHours(gym.weekly_hours);
-  const weekday = hours.mon;
+  // Monday stands in for the week on this summary row; the Settings page is
+  // where the whole schedule lives.
+  const mondayBlocks = blocksForDay(schedule.hourBlocks, 1);
 
   const rows = [
     {
@@ -60,12 +63,17 @@ export default async function AdminMorePage() {
     {
       href: "/admin/settings",
       label: strings.admin.settings.hoursHeading,
-      summary: weekday
-        ? strings.admin.settings.hoursSummary(
-            formatTime(weekday.open),
-            formatTime(weekday.close),
-          )
-        : strings.admin.settings.closedLabel,
+      summary:
+        mondayBlocks.length === 0
+          ? strings.admin.settings.closedLabel
+          : mondayBlocks
+              .map((b) =>
+                strings.admin.settings.hoursSummary(
+                  formatTime(b.start_time),
+                  formatTime(b.end_time),
+                ),
+              )
+              .join(" · "),
     },
     {
       href: "/admin/settings",

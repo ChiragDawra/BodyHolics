@@ -3,7 +3,8 @@ import { GymSettings } from "@/components/admin/GymSettings";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { createClient } from "@/lib/supabase/server";
 import { getPlans, getStaff, getStaffGym } from "@/lib/queries/admin";
-import { parseWeeklyHours, resolveOpenState } from "@/lib/gym";
+import { resolveCrowdLevel, resolveOpenState } from "@/lib/gym";
+import { getGymSchedule } from "@/lib/queries/gym";
 import { strings } from "@/lib/strings";
 
 export const metadata = { title: strings.admin.settings.title };
@@ -21,9 +22,10 @@ export default async function AdminSettingsPage() {
   }
 
   const supabase = await createClient();
-  const [plans, staff, codeResult] = await Promise.all([
+  const [plans, staff, schedule, codeResult] = await Promise.all([
     getPlans(gym.id),
     getStaff(gym.id),
+    getGymSchedule(gym.id),
     // Readable here only because RLS lets staff read their own gym's codes.
     supabase
       .from("staff_codes")
@@ -43,12 +45,10 @@ export default async function AdminSettingsPage() {
       <GymSettings
         gymId={gym.id}
         joinCode={gym.join_code}
-        openState={resolveOpenState(
-          parseWeeklyHours(gym.weekly_hours),
-          gym.is_open_override,
-        )}
-        crowdLevel={gym.crowd_level}
-        initialHours={parseWeeklyHours(gym.weekly_hours)}
+        openState={resolveOpenState(schedule.hourBlocks, gym.is_open_override)}
+        crowd={resolveCrowdLevel(schedule.crowdSlots, gym.crowd_override)}
+        hourBlocks={schedule.hourBlocks}
+        crowdSlots={schedule.crowdSlots}
         plans={plans}
         staff={staff}
         staffCode={codeResult.data?.code ?? null}

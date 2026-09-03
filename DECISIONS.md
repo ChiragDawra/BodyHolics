@@ -743,3 +743,98 @@ Fixed by `is_gym_owner(uuid)`, SECURITY DEFINER for the same reason
   `gyms=1 staff=4 staff_codes=1` after. The Gym settings panel now lists four
   staff accounts and the staff code, having shown neither before.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Phase 9 — Split opening hours and a crowd timetable
+
+### D73. Hours became rows, not a wider JSON shape
+
+`gyms.weekly_hours` held one `{ open, close }` pair per day. The gym's real
+schedule is 5:30–11:30, shut, then 16:00–22:00, and a single range cannot say
+that — it would have to claim the gym is open at 2pm.
+
+`gym_hour_blocks` is one row per stretch of open time, with a CHECK that a
+block ends after it starts. Open now means "now falls inside *any* of today's
+blocks", so the midday gap is closed for the same reason 3am is.
+
+`day_of_week` is ISO — Monday = 1 … Sunday = 7 — matching `gymIsoWeekday()`.
+Postgres's own `extract(dow)` is Sunday = 0, and the column comment says so,
+because that mismatch is a bug waiting to be written.
+
+### D74. `weekly_hours` was dropped, and its contents recorded in the migration
+
+Keeping a dead column that nothing reads is how the next person ends up
+editing the wrong one. Its entire contents at the moment of the drop are
+written into the migration comment, since a dropped column is not recoverable
+and that was the only copy:
+
+```
+mon..fri  { "open": "06:00", "close": "22:00" }
+sat, sun  { "open": "07:00", "close": "20:00" }
+```
+
+They were not converted into blocks — that was the single-range approximation
+this phase exists to replace, and the real hours were seeded instead.
+
+### D75. `crowd_level` was renamed to `crowd_override`, not replaced
+
+Crowd is a weekly pattern: the same hours are busy every Tuesday. Asking the
+desk to remember to update a live figure produces a figure that is always
+wrong, so `crowd_schedule` holds the pattern and the manual value is demoted
+to an override with exactly the shape `is_open_override` already has — null
+follows the schedule, a value beats it.
+
+Renaming rather than adding a second column keeps one answer to "how busy is
+it". The old contents were set to null rather than carried over: until D59
+landed, no write to `gyms` could take effect at all, so the column held the
+seed default and no owner intent.
+
+Outside every scheduled slot the resolver answers `not_crowded`, because those
+are the hours nobody is there.
+
+### D76. The schedule editors are lists, deliberately not a calendar
+
+The owner is describing a weekly pattern that changes twice a year, not
+booking anything. A grid of draggable blocks would be a lot of interface for
+"we shut at eleven-thirty and open again at four". Each day is a list of time
+ranges with an add and a remove; the crowd editor adds a level dropdown.
+
+Both hand the server the complete list and both actions replace wholesale
+rather than diffing. The whole schedule is a few dozen rows, and a diff would
+be more code with more ways to leave an orphan behind.
+
+### D77. The crowd override now has a way back
+
+`GymStatusControls` previously had no way to *clear* a crowd level, because
+there was nothing to fall back to. Now that a schedule exists, picking a level
+sets an override and a "Follow the schedule again" button appears beside it,
+matching "Follow hours". An override nobody can see is an override nobody
+remembers to clear, so the panel also says which of the two is deciding.
+
+### D78. The landing page shows seven days instead of two
+
+"Monday to Friday" and "Saturday and Sunday" cannot describe a split schedule
+without dropping one of the two sessions. Seven rows is more honest, and since
+the midday gap is the thing people get wrong, more useful. Today's row is
+emphasised.
+
+### Verified
+
+- **The resolvers, against the real seeded rows at twelve times of day** that
+  the wall clock would not conveniently be, by importing `lib/gym.ts` directly
+  and fetching the tables over REST. All pass, including the three that matter:
+  13:00 is closed and says "opens 16:00"; 15:59 is still closed; 16:00 is open
+  until 22:00. Boundaries are half-open as intended — 21:59 open, 22:00 shut.
+  The weekday rushes (07:30 and 18:30 crowded) and the quieter weekend evening
+  resolve correctly. Five override assertions pass too: forcing open at 13:00,
+  forcing closed at 18:00, and a crowd override beating the timetable.
+- **Live at the current wall clock** — Thursday 17:06 IST rendered "OPEN until
+  10 pm" and "Filling up", which is the 16:00–22:00 block and the 16:00–18:00
+  moderate slot.
+- **The editors write** — changed Monday 05:30–07:00 from "Not crowded" to
+  "Very crowded" in the browser and read it back over REST as `very_crowded`,
+  with the other 35 rows intact and the total still 36, confirming the
+  delete-then-insert replaces rather than duplicates. Restored afterwards and
+  confirmed back to `not_crowded`.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

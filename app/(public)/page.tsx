@@ -8,7 +8,15 @@ import {
   LiveCrowdMeter,
   LiveHeroStatus,
 } from "@/components/member/GymLive";
-import { DAY_LABELS, parseWeeklyHours, formatTime } from "@/lib/gym";
+import {
+  blocksForDay,
+  DAY_KEYS,
+  DAY_LABELS,
+  formatTime,
+  gymIsoWeekday,
+  type HourBlock,
+} from "@/lib/gym";
+import { getGymSchedule } from "@/lib/queries/gym";
 import { homeFor } from "@/lib/config";
 import { strings } from "@/lib/strings";
 
@@ -20,16 +28,16 @@ export default async function LandingPage() {
   const [{ data: gym }, user] = await Promise.all([
     supabase
       .from("gyms")
-      .select("id, name, join_code, weekly_hours, is_open_override, crowd_level")
+      .select("id, name, join_code, is_open_override, crowd_override")
       .limit(1)
       .maybeSingle(),
     getUser(),
   ]);
 
-  const hours = parseWeeklyHours(gym?.weekly_hours);
-
-  const weekday = hours.mon;
-  const weekend = hours.sat;
+  const schedule = gym
+    ? await getGymSchedule(gym.id)
+    : { hourBlocks: [], crowdSlots: [] };
+  const todayIso = gymIsoWeekday();
 
   return (
     <main className="mx-auto w-full max-w-md px-5 pb-16 pt-[calc(3rem+env(safe-area-inset-top))]">
@@ -45,9 +53,10 @@ export default async function LandingPage() {
         <GymLiveProvider
           gymId={gym.id}
           initial={{
-            weeklyHours: hours,
+            hourBlocks: schedule.hourBlocks,
+            crowdSlots: schedule.crowdSlots,
             isOpenOverride: gym.is_open_override,
-            crowdLevel: gym.crowd_level,
+            crowdOverride: gym.crowd_override,
           }}
         >
           <div className="mt-7">
@@ -76,48 +85,60 @@ export default async function LandingPage() {
       <section className="mt-9">
         <CardLabel>{strings.landing.hoursHeading}</CardLabel>
         <Card className="mt-2.5 px-5 py-1">
-          <HoursRow
-            label={strings.landing.weekdays}
-            hours={
-              weekday
-                ? `${formatTime(weekday.open)} to ${formatTime(weekday.close)}`
-                : strings.landing.closed
-            }
-          />
-          <HoursRow
-            label={strings.landing.weekends}
-            hours={
-              weekend
-                ? `${formatTime(weekend.open)} to ${formatTime(weekend.close)}`
-                : strings.landing.closed
-            }
-          />
+          {DAY_KEYS.map((day, index) => (
+            <HoursRow
+              key={day}
+              label={DAY_LABELS[day]}
+              blocks={blocksForDay(schedule.hourBlocks, index + 1)}
+              today={index + 1 === todayIso}
+            />
+          ))}
         </Card>
-
-        {/* The two-row summary is a simplification; screen readers get the
-            actual seven days rather than an approximation of them. */}
-        <p className="sr-only">
-          {Object.entries(DAY_LABELS)
-            .map(([key, label]) => {
-              const day = hours[key as keyof typeof hours];
-              return `${label}: ${
-                day
-                  ? `${formatTime(day.open)} to ${formatTime(day.close)}`
-                  : strings.landing.closed
-              }`;
-            })
-            .join(". ")}
-        </p>
       </section>
     </main>
   );
 }
 
-function HoursRow({ label, hours }: { label: string; hours: string }) {
+/**
+ * One day of the week and every block in it.
+ *
+ * The old two-row "weekdays / weekends" summary cannot describe a split
+ * schedule — it would have to pick one of the two sessions and drop the
+ * other. Seven rows is more honest and, since the gap in the middle is the
+ * thing people get wrong, more useful.
+ */
+function HoursRow({
+  label,
+  blocks,
+  today,
+}: {
+  label: string;
+  blocks: HourBlock[];
+  today: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-border-soft py-3.5 last:border-0">
-      <span className="text-ink-muted">{label}</span>
-      <span className="font-display font-semibold text-ink">{hours}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b border-border-soft py-3.5 last:border-0">
+      <span className={today ? "font-medium text-ink" : "text-ink-muted"}>
+        {label}
+      </span>
+
+      {blocks.length === 0 ? (
+        <span className="text-sm text-ink-dim">{strings.landing.closed}</span>
+      ) : (
+        <span className="flex flex-col items-end gap-0.5">
+          {blocks.map((block) => (
+            <span
+              key={`${block.start_time}-${block.end_time}`}
+              className="font-display text-sm font-semibold text-ink"
+            >
+              {strings.landing.range(
+                formatTime(block.start_time),
+                formatTime(block.end_time),
+              )}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

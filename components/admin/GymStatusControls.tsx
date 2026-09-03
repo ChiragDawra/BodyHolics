@@ -1,39 +1,52 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setCrowdLevel, setOpenOverride } from "@/lib/actions/admin";
-import { CROWD_BG, CROWD_LEVELS, CROWD_TEXT, type CrowdLevel, type OpenState } from "@/lib/gym";
+import { setCrowdOverride, setOpenOverride } from "@/lib/actions/admin";
+import {
+  CROWD_BG,
+  CROWD_LEVELS,
+  CROWD_TEXT,
+  type CrowdLevel,
+  type CrowdState,
+  type OpenState,
+} from "@/lib/gym";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/cn";
 
 /**
- * Open/closed and crowd level, the two things the owner changes most.
+ * Open/closed and crowd, the two things the owner changes most.
+ *
+ * Both are overrides now: the gym follows its opening hours and its weekly
+ * crowd timetable on its own, and these controls exist for the days that do
+ * not go to plan. So both carry a way back — once an override is set, a
+ * "Follow schedule" button appears beside it, because an override nobody can
+ * see is an override nobody remembers to clear.
  *
  * Both write optimistically: the desk taps "Force closed" and the word flips
  * immediately, because waiting on a round trip in front of a queue is what
  * makes staff stop using a tool.
  *
- * "Optimistic" only works if a failure is visible. Until Phase 8 these
- * writes were being rejected by RLS, which Postgres reports as a successful
- * update of zero rows, so the action returned ok and the flip stuck on screen
- * while the database never changed. Both handlers now roll the local state
- * back and surface the message when the action fails, so a silent write can
- * never look like a successful one again.
+ * "Optimistic" only works if a failure is visible. Until Phase 8 these writes
+ * were being rejected by RLS, which Postgres reports as a successful update
+ * of zero rows, so the action returned ok and the flip stuck on screen while
+ * the database never changed. Both handlers now roll the local state back and
+ * surface the message when the action fails.
  */
 export function GymStatusControls({
   gymId,
   openState,
-  crowdLevel,
+  crowd,
   compact = false,
 }: {
   gymId: string;
   openState: OpenState;
-  crowdLevel: CrowdLevel;
+  crowd: CrowdState;
   compact?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(openState.isOpen);
   const [overridden, setOverridden] = useState(openState.overridden);
-  const [crowd, setCrowd] = useState(crowdLevel);
+  const [level, setLevel] = useState(crowd.level);
+  const [crowdOverridden, setCrowdOverridden] = useState(crowd.overridden);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -53,15 +66,17 @@ export function GymStatusControls({
     });
   };
 
-  const applyCrowd = (level: CrowdLevel) => {
-    const previous = crowd;
+  const applyCrowd = (value: CrowdLevel | null) => {
+    const previous = { level, crowdOverridden };
     setError(null);
-    setCrowd(level);
+    setCrowdOverridden(value !== null);
+    setLevel(value ?? crowd.level);
 
     startTransition(async () => {
-      const result = await setCrowdLevel({ gymId, level });
+      const result = await setCrowdOverride({ gymId, level: value });
       if (!result.ok) {
-        setCrowd(previous);
+        setLevel(previous.level);
+        setCrowdOverridden(previous.crowdOverridden);
         setError(result.message);
       }
     });
@@ -127,21 +142,27 @@ export function GymStatusControls({
           <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
             {strings.admin.settings.crowdHeading}
           </p>
-          <p className={cn("font-display text-[0.9375rem] font-bold", CROWD_TEXT[crowd])}>
-            {strings.member.crowd[crowd]}
+          <p className={cn("font-display text-[0.9375rem] font-bold", CROWD_TEXT[level])}>
+            {strings.member.crowd[level]}
           </p>
         </div>
 
+        <p className="mt-1.5 text-xs text-ink-dim">
+          {crowdOverridden
+            ? strings.admin.settings.crowdOverridden
+            : strings.admin.settings.crowdFromSchedule}
+        </p>
+
         <div className="mt-3.5 grid grid-cols-2 gap-2">
-          {CROWD_LEVELS.map((level) => {
-            const active = crowd === level;
+          {CROWD_LEVELS.map((option) => {
+            const active = crowdOverridden && level === option;
             return (
               <button
-                key={level}
+                key={option}
                 type="button"
                 disabled={pending}
                 aria-pressed={active}
-                onClick={() => applyCrowd(level)}
+                onClick={() => applyCrowd(option)}
                 className={cn(
                   "flex items-center gap-2 rounded-sm border px-3 py-2.5 text-left",
                   "font-body text-xs font-medium transition-colors disabled:opacity-60",
@@ -152,13 +173,24 @@ export function GymStatusControls({
               >
                 <span
                   aria-hidden
-                  className={cn("h-1.5 w-1.5 flex-none rounded-full", CROWD_BG[level])}
+                  className={cn("h-1.5 w-1.5 flex-none rounded-full", CROWD_BG[option])}
                 />
-                {strings.member.crowd[level]}
+                {strings.member.crowd[option]}
               </button>
             );
           })}
         </div>
+
+        {crowdOverridden ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => applyCrowd(null)}
+            className="mt-2.5 font-body text-xs font-medium text-ink-dim transition-colors hover:text-ink disabled:opacity-60"
+          >
+            {strings.admin.settings.followCrowdSchedule}
+          </button>
+        ) : null}
       </div>
 
       {error ? (

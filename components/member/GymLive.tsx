@@ -13,11 +13,13 @@ import { createClient } from "@/lib/supabase/client";
 import { HeroStatus } from "@/components/member/HeroStatus";
 import { CrowdMeter } from "@/components/member/CrowdMeter";
 import {
-  parseWeeklyHours,
+  resolveCrowdLevel,
   resolveOpenState,
   type CrowdLevel,
+  type CrowdSlot,
+  type CrowdState,
+  type HourBlock,
   type OpenState,
-  type WeeklyHours,
 } from "@/lib/gym";
 
 /**
@@ -28,21 +30,19 @@ import {
  * tiles at the top of the home screen — a status that needs a pull-to-refresh
  * to be true is not a status, it is a cached opinion.
  *
- * The subscription is `postgres_changes` on the single `gyms` row. Realtime
- * applies RLS to what it streams, and `gyms` is world-readable, so this works
- * signed in on /app and signed out on the landing page alike.
- *
- * One provider per screen, not one per tile: two components subscribing to the
- * same table would open two channels for the same row.
+ * Realtime applies RLS to what it streams, and all three tables here are
+ * world-readable, so this works signed in on /app and signed out on the
+ * landing page alike.
  */
 
 export type GymSnapshot = {
-  weeklyHours: WeeklyHours;
+  hourBlocks: HourBlock[];
+  crowdSlots: CrowdSlot[];
   isOpenOverride: boolean | null;
-  crowdLevel: CrowdLevel;
+  crowdOverride: CrowdLevel | null;
 };
 
-type LiveGym = GymSnapshot & { openState: OpenState };
+type LiveGym = { openState: OpenState; crowd: CrowdState };
 
 const GymContext = createContext<LiveGym | null>(null);
 
@@ -74,11 +74,7 @@ export function GymLiveProvider({
    * server render clears the live row — otherwise a change missed while the
    * socket was disconnected would be masked forever by a stale event.
    */
-  const initialKey = JSON.stringify([
-    initial.weeklyHours,
-    initial.isOpenOverride,
-    initial.crowdLevel,
-  ]);
+  const initialKey = JSON.stringify(initial);
   const [seenKey, setSeenKey] = useState(initialKey);
   const [live, setLive] = useState<GymSnapshot | null>(null);
 
@@ -91,11 +87,11 @@ export function GymLiveProvider({
 
   /**
    * The gym also opens and closes because time passed, not because anyone
-   * touched a control. Re-resolving every minute keeps the word honest
-   * through 10pm without a refresh.
+   * touched a control — and with a split schedule that now happens four
+   * times a day, plus every boundary in the crowd timetable.
    *
    * Undefined until the first tick so the server render and the hydration
-   * render agree; `resolveOpenState` falls back to its own `new Date()`.
+   * render agree; both resolvers fall back to their own `new Date()`.
    */
   const [now, setNow] = useState<Date>();
 
@@ -109,6 +105,11 @@ export function GymLiveProvider({
 
     const channel = supabase
       .channel(`gym-status-${gymId}`)
+      /**
+       * The overrides are the ones that have to be instant — this is the desk
+       * flipping the gym closed in front of a queue — so they are applied
+       * straight from the payload rather than waiting for a refetch.
+       */
       .on(
         "postgres_changes",
         {
@@ -119,35 +120,57 @@ export function GymLiveProvider({
         },
         (payload) => {
           const row = payload.new as {
-            weekly_hours?: unknown;
             is_open_override?: boolean | null;
-            crowd_level?: CrowdLevel;
+            crowd_override?: CrowdLevel | null;
           };
 
-          setLive({
-            weeklyHours: parseWeeklyHours(row.weekly_hours),
+          setLive((prev) => ({
+            ...(prev ?? initial),
             isOpenOverride: row.is_open_override ?? null,
-            crowdLevel: row.crowd_level ?? "not_crowded",
-          });
+            crowdOverride: row.crowd_override ?? null,
+          }));
 
-          // The tiles are already correct from the payload. This refreshes
-          // everything else on the screen that the same change can affect.
+          // Everything else on the screen the same change can affect.
           router.refresh();
         },
+      )
+      /**
+       * Schedule edits are rare and arrive one row at a time, so rebuilding
+       * the whole list from a payload would be more code than it is worth.
+       * A refresh re-renders the server component with the new schedule, and
+       * the `initialKey` comparison above then retires the live row.
+       */
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "gym_hour_blocks" },
+        () => router.refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crowd_schedule" },
+        () => router.refresh(),
       )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
+    // `initial` is only read inside the handler as a fallback for the very
+    // first event; re-subscribing whenever it changes identity would tear the
+    // channel down on every server render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gymId, router]);
 
   const value = useMemo<LiveGym>(
     () => ({
-      ...snapshot,
       openState: resolveOpenState(
-        snapshot.weeklyHours,
+        snapshot.hourBlocks,
         snapshot.isOpenOverride,
+        now,
+      ),
+      crowd: resolveCrowdLevel(
+        snapshot.crowdSlots,
+        snapshot.crowdOverride,
         now,
       ),
     }),
@@ -162,5 +185,5 @@ export function LiveHeroStatus() {
 }
 
 export function LiveCrowdMeter() {
-  return <CrowdMeter level={useGym().crowdLevel} />;
+  return <CrowdMeter level={useGym().crowd.level} />;
 }

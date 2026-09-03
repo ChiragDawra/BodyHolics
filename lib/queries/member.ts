@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   gymIsoWeekday,
-  parseWeeklyHours,
+  resolveCrowdLevel,
   resolveOpenState,
   type CrowdLevel,
+  type CrowdState,
   type OpenState,
-  type WeeklyHours,
 } from "@/lib/gym";
+import { getGymSchedule, type CrowdSlotRow, type HourBlockRow } from "@/lib/queries/gym";
 import { gymTodayKey } from "@/lib/attendance";
 
 export type MembershipRow = {
@@ -32,11 +33,13 @@ export type MemberSnapshot = {
   };
   gymName: string;
   openState: OpenState;
-  /* The raw schedule fields too, so the client can re-resolve open/closed
+  crowd: CrowdState;
+  /* The schedule and the overrides too, so the client can re-resolve both
      from a realtime payload without another round trip. */
-  weeklyHours: WeeklyHours;
+  hourBlocks: HourBlockRow[];
+  crowdSlots: CrowdSlotRow[];
   isOpenOverride: boolean | null;
-  crowdLevel: CrowdLevel;
+  crowdOverride: CrowdLevel | null;
   crowdUpdatedAt: string;
   membership: MembershipRow | null;
   /** Everyone currently checked in and not out — the "Right now" tile. */
@@ -88,7 +91,7 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
     await Promise.all([
       supabase
         .from("gyms")
-        .select("name, weekly_hours, is_open_override, crowd_level, crowd_updated_at")
+        .select("name, is_open_override, crowd_override, crowd_updated_at")
         .eq("id", profile.gym_id)
         .maybeSingle(),
       supabase
@@ -125,16 +128,19 @@ export async function getMemberSnapshot(): Promise<MemberSnapshot | null> {
   const gym = gymResult.data;
   const quiet = quietResult.data as { hour?: number } | null;
   const membershipRow = membershipResult.data;
-  const weeklyHours = parseWeeklyHours(gym?.weekly_hours);
   const isOpenOverride = gym?.is_open_override ?? null;
+  const crowdOverride = gym?.crowd_override ?? null;
+  const { hourBlocks, crowdSlots } = await getGymSchedule(profile.gym_id);
 
   return {
     profile,
     gymName: gym?.name ?? "",
-    openState: resolveOpenState(weeklyHours, isOpenOverride),
-    weeklyHours,
+    openState: resolveOpenState(hourBlocks, isOpenOverride),
+    crowd: resolveCrowdLevel(crowdSlots, crowdOverride),
+    hourBlocks,
+    crowdSlots,
     isOpenOverride,
-    crowdLevel: gym?.crowd_level ?? "not_crowded",
+    crowdOverride,
     crowdUpdatedAt: gym?.crowd_updated_at ?? new Date().toISOString(),
     membership: membershipRow
       ? {

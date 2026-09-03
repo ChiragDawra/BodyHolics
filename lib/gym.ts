@@ -2,12 +2,12 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export type CrowdLevel = Database["public"]["Enums"]["crowd_level"];
 
-export const CROWD_LEVELS: readonly CrowdLevel[] = [
+export const CROWD_LEVELS = [
   "not_crowded",
   "moderate",
   "crowded",
   "very_crowded",
-] as const;
+] as const satisfies readonly CrowdLevel[];
 
 /** Token class per crowd bucket. Semantic, so a palette change cannot break it. */
 export const CROWD_TEXT: Record<CrowdLevel, string> = {
@@ -57,15 +57,27 @@ export const DAY_LABELS: Record<DayKey, string> = {
 /** Two-letter column headings on the activity grid. */
 export const DAY_INITIALS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const;
 
-export type DayHours = { open: string; close: string } | null;
-export type WeeklyHours = Partial<Record<DayKey, DayHours>>;
-
 /**
- * The gym is in one Indian city, so every "today" and "now" in the app is
- * Asia/Kolkata regardless of where the phone thinks it is. A member opening
- * the app on a phone still set to another timezone must not see the wrong
- * open/closed state.
+ * A stretch of the day the gym is open. Opening hours are a list of these,
+ * not one range per day: this gym runs 5:30–11:30 and again 16:00–22:00, and
+ * a single { open, close } pair would have to claim it is open at 2pm.
+ *
+ * `day_of_week` is ISO — Monday = 1 … Sunday = 7 — matching `gymIsoWeekday()`
+ * and the column of the same name. Postgres's own `extract(dow)` is Sunday=0;
+ * this is deliberately not that.
+ *
+ * Times arrive from Postgres `time` columns as "05:30:00". Everything here
+ * reads hours and minutes and ignores the seconds.
  */
+export type HourBlock = {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
+/** One row of the weekly crowd timetable. */
+export type CrowdSlot = HourBlock & { level: CrowdLevel };
+
 export const GYM_TIME_ZONE = "Asia/Kolkata";
 
 function gymParts(now: Date) {
@@ -97,7 +109,7 @@ export function gymWeekdayLabel(now: Date = new Date()): string {
   return DAY_LABELS[key] ?? DAY_LABELS.mon;
 }
 
-function toMinutes(hhmm: string): number | null {
+export function toMinutes(hhmm: string): number | null {
   const [h, m] = hhmm.split(":");
   if (h === undefined || m === undefined) return null;
   const hours = Number(h);
@@ -128,11 +140,22 @@ export function formatHour(hour: number): string {
   return `${display} ${suffix}`;
 }
 
+/** Today's blocks, earliest first. */
+export function blocksForDay<T extends HourBlock>(
+  blocks: readonly T[],
+  isoWeekday: number,
+): T[] {
+  return blocks
+    .filter((b) => b.day_of_week === isoWeekday)
+    .sort((a, b) => (toMinutes(a.start_time) ?? 0) - (toMinutes(b.start_time) ?? 0));
+}
+
 export type OpenState = {
   isOpen: boolean;
   /** True when a staff override is deciding this, not the schedule. */
   overridden: boolean;
-  today: DayHours;
+  /** Every block for today, in order. Empty means closed all day. */
+  todayBlocks: HourBlock[];
   /** Set when closed and the gym opens again later today. */
   opensAt: string | null;
   /** Set when open. */
@@ -142,65 +165,88 @@ export type OpenState = {
 /**
  * Whether the gym is open right now.
  *
+ * Open means now falls inside *any* of today's blocks — the midday gap
+ * between the morning and evening sessions is closed, and so is anything
+ * before the first block or after the last.
+ *
  * `is_open_override` beats the schedule in both directions: true forces open,
- * false forces closed, null follows weekly_hours.
+ * false forces closed, null follows the blocks.
  */
 export function resolveOpenState(
-  weeklyHours: WeeklyHours,
+  blocks: readonly HourBlock[],
   isOpenOverride: boolean | null,
   now: Date = new Date(),
 ): OpenState {
-  const { weekday, minutes } = gymParts(now);
-  const today = weeklyHours[weekday] ?? null;
+  const { minutes } = gymParts(now);
+  const todayBlocks = blocksForDay(blocks, gymIsoWeekday(now));
+
+  const current = todayBlocks.find((b) => {
+    const open = toMinutes(b.start_time);
+    const close = toMinutes(b.end_time);
+    return open !== null && close !== null && minutes >= open && minutes < close;
+  });
+
+  const next = todayBlocks.find((b) => {
+    const open = toMinutes(b.start_time);
+    return open !== null && open > minutes;
+  });
 
   if (isOpenOverride !== null) {
     return {
       isOpen: isOpenOverride,
       overridden: true,
-      today,
-      opensAt: !isOpenOverride && today ? today.open : null,
-      closesAt: isOpenOverride && today ? today.close : null,
+      todayBlocks,
+      // Forced closed, but the schedule still says when it would reopen.
+      opensAt: !isOpenOverride ? (next?.start_time ?? null) : null,
+      closesAt: isOpenOverride ? (current?.end_time ?? null) : null,
     };
   }
 
-  if (!today) {
-    return { isOpen: false, overridden: false, today: null, opensAt: null, closesAt: null };
-  }
-
-  const open = toMinutes(today.open);
-  const close = toMinutes(today.close);
-  if (open === null || close === null) {
-    return { isOpen: false, overridden: false, today, opensAt: null, closesAt: null };
-  }
-
-  const isOpen = minutes >= open && minutes < close;
-
   return {
-    isOpen,
+    isOpen: current !== undefined,
     overridden: false,
-    today,
-    opensAt: !isOpen && minutes < open ? today.open : null,
-    closesAt: isOpen ? today.close : null,
+    todayBlocks,
+    opensAt: current === undefined ? (next?.start_time ?? null) : null,
+    closesAt: current?.end_time ?? null,
   };
 }
 
-/** Parses the jsonb column into something typed, tolerating a malformed row. */
-export function parseWeeklyHours(value: unknown): WeeklyHours {
-  if (typeof value !== "object" || value === null) return {};
-  const out: WeeklyHours = {};
+export type CrowdState = {
+  level: CrowdLevel;
+  /** True when a staff override is deciding this, not the schedule. */
+  overridden: boolean;
+};
 
-  for (const day of DAY_KEYS) {
-    const raw = (value as Record<string, unknown>)[day];
-    if (typeof raw !== "object" || raw === null) {
-      out[day] = null;
-      continue;
-    }
-    const { open, close } = raw as Record<string, unknown>;
-    out[day] =
-      typeof open === "string" && typeof close === "string" ? { open, close } : null;
+/**
+ * How busy the gym is right now.
+ *
+ * This is a timetable the owner maintains, never a headcount and never
+ * anything sensed from a device — the same hours are busy every Tuesday, and
+ * asking the desk to remember to update a live figure is asking for a figure
+ * that is always wrong.
+ *
+ * `crowd_override` beats the timetable, the same shape as
+ * `is_open_override` beating the hours. Outside every scheduled slot the
+ * honest answer is the quiet one: those are the hours nobody is here.
+ */
+export function resolveCrowdLevel(
+  slots: readonly CrowdSlot[],
+  crowdOverride: CrowdLevel | null,
+  now: Date = new Date(),
+): CrowdState {
+  if (crowdOverride !== null) {
+    return { level: crowdOverride, overridden: true };
   }
 
-  return out;
+  const { minutes } = gymParts(now);
+
+  const current = blocksForDay(slots, gymIsoWeekday(now)).find((slot) => {
+    const from = toMinutes(slot.start_time);
+    const to = toMinutes(slot.end_time);
+    return from !== null && to !== null && minutes >= from && minutes < to;
+  });
+
+  return { level: current?.level ?? "not_crowded", overridden: false };
 }
 
 /** "9876543210" -> "+91 98765 43210". Leaves anything unexpected alone. */

@@ -36,6 +36,7 @@ export const strings = {
     weekdays: "Monday to Friday",
     weekends: "Saturday and Sunday",
     closed: "Closed",
+    range: (from: string, to: string) => `${from} – ${to}`,
     perDuration: (days: number) =>
       days === 30
         ? "a month"
@@ -377,10 +378,23 @@ export const strings = {
       closedLabel: "Closed",
       overrideHeading: "Override",
       overrideNote: "Beats the schedule until cleared",
+      blockOutOfOrder: "A time range has to end after it starts.",
       followHours: "Follow hours",
       forceOpen: "Force open",
       forceClosed: "Force closed",
       crowdHeading: "Crowd level",
+      crowdFromSchedule: "Following the weekly schedule",
+      crowdOverridden: "Set by hand · beats the schedule",
+      followCrowdSchedule: "Follow the schedule again",
+      hoursSplitNote:
+        "A day can have as many ranges as it needs — a morning and an evening session with the gym shut between them is two.",
+      addRange: "Add a time range",
+      removeRange: "Remove",
+      crowdScheduleHeading: "Crowd schedule",
+      crowdScheduleNote:
+        "What members are told to expect, by day and time. Nothing here is measured — it is the pattern you know.",
+      addCrowdSlot: "Add a time range",
+      closedAllDay: "Closed all day",
       plansHeading: "Plans",
       newPlan: "New plan",
       editPlan: "Edit plan",

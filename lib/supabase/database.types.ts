@@ -155,6 +155,79 @@ export type Database = {
           },
         ]
       }
+      crowd_schedule: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id: string
+          level: Database["public"]["Enums"]["crowd_level"]
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id?: string
+          level: Database["public"]["Enums"]["crowd_level"]
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          gym_id?: string
+          id?: string
+          level?: Database["public"]["Enums"]["crowd_level"]
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crowd_schedule_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gym_hour_blocks: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          gym_id: string
+          id?: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          gym_id?: string
+          id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_hour_blocks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_secrets: {
         Row: {
           check_pin_hash: string
@@ -184,36 +257,33 @@ export type Database = {
       gyms: {
         Row: {
           created_at: string
-          crowd_level: Database["public"]["Enums"]["crowd_level"]
+          crowd_override: Database["public"]["Enums"]["crowd_level"] | null
           crowd_updated_at: string
           id: string
           is_open_override: boolean | null
           join_code: string
           name: string
           slug: string
-          weekly_hours: Json
         }
         Insert: {
           created_at?: string
-          crowd_level?: Database["public"]["Enums"]["crowd_level"]
+          crowd_override?: Database["public"]["Enums"]["crowd_level"] | null
           crowd_updated_at?: string
           id?: string
           is_open_override?: boolean | null
           join_code: string
           name: string
           slug: string
-          weekly_hours?: Json
         }
         Update: {
           created_at?: string
-          crowd_level?: Database["public"]["Enums"]["crowd_level"]
+          crowd_override?: Database["public"]["Enums"]["crowd_level"] | null
           crowd_updated_at?: string
           id?: string
           is_open_override?: boolean | null
           join_code?: string
           name?: string
           slug?: string
-          weekly_hours?: Json
         }
         Relationships: []
       }
@@ -551,6 +621,7 @@ export type Database = {
         }
         Returns: Json
       }
+      is_gym_owner: { Args: { p_gym_id: string }; Returns: boolean }
       is_staff: { Args: { p_gym_id: string }; Returns: boolean }
       is_staff_anywhere: { Args: never; Returns: boolean }
       membership_is_current: {

@@ -15,7 +15,7 @@ export async function getStaffGym() {
 
   const { data } = await supabase
     .from("gyms")
-    .select("id, name, slug, join_code, weekly_hours, is_open_override, crowd_level, crowd_updated_at")
+    .select("id, name, slug, join_code, is_open_override, crowd_override, crowd_updated_at")
     .limit(1)
     .maybeSingle();
 

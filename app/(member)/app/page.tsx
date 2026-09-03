@@ -73,9 +73,10 @@ export default async function MemberHomePage() {
         <GymLiveProvider
           gymId={snapshot.profile.gym_id}
           initial={{
-            weeklyHours: snapshot.weeklyHours,
+            hourBlocks: snapshot.hourBlocks,
+            crowdSlots: snapshot.crowdSlots,
             isOpenOverride: snapshot.isOpenOverride,
-            crowdLevel: snapshot.crowdLevel,
+            crowdOverride: snapshot.crowdOverride,
           }}
         >
           <LiveHeroStatus />

@@ -2,18 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { GymStatusControls } from "@/components/admin/GymStatusControls";
 import { CopyIcon, PlusIcon } from "@/components/ui/icons";
-import { createPlan, togglePlan, updateHours, updatePlan } from "@/lib/actions/admin";
-import {
-  DAY_KEYS,
-  DAY_LABELS,
-  type CrowdLevel,
-  type DayKey,
-  type OpenState,
-  type WeeklyHours,
-} from "@/lib/gym";
+import { CrowdScheduleEditor, HoursEditor } from "@/components/admin/ScheduleEditor";
+import { createPlan, togglePlan, updatePlan } from "@/lib/actions/admin";
+import type { CrowdSlotRow, HourBlockRow } from "@/lib/queries/gym";
+import type { CrowdState, OpenState } from "@/lib/gym";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/cn";
 
@@ -45,8 +39,9 @@ export function GymSettings({
   gymId,
   joinCode,
   openState,
-  crowdLevel,
-  initialHours,
+  crowd,
+  hourBlocks,
+  crowdSlots,
   plans,
   staff,
   staffCode,
@@ -54,34 +49,18 @@ export function GymSettings({
   gymId: string;
   joinCode: string;
   openState: OpenState;
-  crowdLevel: CrowdLevel;
-  initialHours: WeeklyHours;
+  crowd: CrowdState;
+  hourBlocks: HourBlockRow[];
+  crowdSlots: CrowdSlotRow[];
   plans: PlanRow[];
   staff: StaffRow[];
   staffCode: string | null;
 }) {
-  const [hours, setHours] = useState<WeeklyHours>(initialHours);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState<PlanRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  const setDay = (day: DayKey, next: { open: string; close: string } | null) => {
-    setHours((prev) => ({ ...prev, [day]: next }));
-    setSaved(false);
-  };
-
-  const saveHours = () => {
-    setError(null);
-    startTransition(async () => {
-      const payload = Object.fromEntries(DAY_KEYS.map((d) => [d, hours[d] ?? null]));
-      const result = await updateHours({ gymId, weeklyHours: payload });
-      if (result.ok) setSaved(true);
-      else setError(result.message);
-    });
-  };
 
   const toggle = (plan: PlanRow) => {
     setError(null);
@@ -111,75 +90,15 @@ export function GymSettings({
         </p>
       ) : null}
 
-      {/* Opening hours */}
-      <div className="rounded-lg border border-border bg-surface-raised p-5">
-        <div className="mb-3.5 flex items-center justify-between gap-3">
-          <p className="font-body text-label font-semibold tracking-label uppercase text-ink-dim">
-            {strings.admin.settings.hoursHeading}
-          </p>
-          {saved ? <Badge tone="success">{strings.admin.settings.saved}</Badge> : null}
-        </div>
-
-        {DAY_KEYS.map((day) => {
-          const value = hours[day] ?? null;
-          return (
-            <div
-              key={day}
-              className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-border-soft py-2.5 sm:grid-cols-[1fr_auto_auto]"
-            >
-              <span className="text-sm font-medium text-ink">{DAY_LABELS[day]}</span>
-
-              {value ? (
-                <>
-                  <input
-                    type="time"
-                    aria-label={`${DAY_LABELS[day]} ${strings.admin.settings.openLabel}`}
-                    value={value.open}
-                    onChange={(e) => setDay(day, { ...value, open: e.target.value })}
-                    className="rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono text-xs text-ink-muted outline-none focus:border-border-strong"
-                  />
-                  <input
-                    type="time"
-                    aria-label={`${DAY_LABELS[day]} ${strings.admin.settings.closeLabel}`}
-                    value={value.close}
-                    onChange={(e) => setDay(day, { ...value, close: e.target.value })}
-                    className="rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono text-xs text-ink-muted outline-none focus:border-border-strong"
-                  />
-                </>
-              ) : (
-                <span className="col-span-2 justify-self-end text-xs text-ink-faint">
-                  {strings.admin.settings.closedLabel}
-                </span>
-              )}
-
-              <label className="col-span-2 flex items-center gap-2 text-xs text-ink-dim sm:col-span-3">
-                <input
-                  type="checkbox"
-                  checked={value === null}
-                  onChange={(e) =>
-                    setDay(day, e.target.checked ? null : { open: "06:00", close: "22:00" })
-                  }
-                  className="h-3.5 w-3.5 accent-[var(--color-brand)]"
-                />
-                {strings.admin.settings.closedLabel}
-              </label>
-            </div>
-          );
-        })}
-
-        <Button className="mt-4" disabled={pending} onClick={saveHours}>
-          {pending ? strings.admin.settings.saving : strings.admin.settings.save}
-        </Button>
+      <div className="flex flex-col gap-3.5">
+        <HoursEditor gymId={gymId} blocks={hourBlocks} />
+        <CrowdScheduleEditor gymId={gymId} slots={crowdSlots} />
       </div>
 
       <div className="flex flex-col gap-3.5">
         {/* Override + crowd, the same controls as the dashboard. */}
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <GymStatusControls
-            gymId={gymId}
-            openState={openState}
-            crowdLevel={crowdLevel}
-          />
+          <GymStatusControls gymId={gymId} openState={openState} crowd={crowd} />
           <p className="pt-1 text-xs text-ink-dim">
             {strings.admin.settings.overrideNote}
           </p>

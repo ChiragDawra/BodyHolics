@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { CROWD_LEVELS } from "@/lib/gym";
 import { isStaff } from "@/lib/supabase/auth";
 import { strings } from "@/lib/strings";
 
@@ -283,40 +284,109 @@ export async function startMembership(input: unknown): Promise<ActionResult> {
 
 /* ------------------------------------------------------------- gym settings */
 
-const dayHoursSchema = z
-  .object({
-    open: z.string().regex(/^\d{2}:\d{2}$/),
-    close: z.string().regex(/^\d{2}:\d{2}$/),
-  })
-  .nullable();
+/**
+ * A time as the browser's <input type="time"> gives it: "05:30". Postgres
+ * hands the same column back as "05:30:00", which the tolerant tail makes
+ * legal here so a round trip through the form does not fail validation.
+ */
+const timeSchema = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/);
 
-const settingsSchema = z.object({
-  gymId: z.string().uuid(),
-  weeklyHours: z.object({
-    mon: dayHoursSchema,
-    tue: dayHoursSchema,
-    wed: dayHoursSchema,
-    thu: dayHoursSchema,
-    fri: dayHoursSchema,
-    sat: dayHoursSchema,
-    sun: dayHoursSchema,
-  }),
+const scheduleRowSchema = z.object({
+  dayOfWeek: z.coerce.number().int().min(1).max(7),
+  startTime: timeSchema,
+  endTime: timeSchema,
 });
 
-export async function updateHours(input: unknown): Promise<ActionResult> {
-  const parsed = settingsSchema.safeParse(input);
+/** Rejects a block that ends before it starts, matching the CHECK constraint. */
+function ordered(row: { startTime: string; endTime: string }): boolean {
+  return row.endTime.slice(0, 5) > row.startTime.slice(0, 5);
+}
+
+/**
+ * Opening hours, replaced wholesale.
+ *
+ * Delete-then-insert rather than diffing: the whole schedule is at most a few
+ * dozen rows, the editor hands back the complete list every time, and a diff
+ * would be more code with more ways to leave an orphan behind.
+ */
+export async function replaceHourBlocks(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      gymId: z.string().uuid(),
+      blocks: z.array(scheduleRowSchema).max(60),
+    })
+    .safeParse(input);
+
   if (!parsed.success) return FAILED;
+  if (parsed.data.blocks.some((b) => !ordered(b))) {
+    return { ok: false, message: strings.admin.settings.blockOutOfOrder };
+  }
   if (!(await guard())) return DENIED;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("gyms")
-    .update({ weekly_hours: parsed.data.weeklyHours })
-    .eq("id", parsed.data.gymId)
-    .select("id");
 
-  if (error) return FAILED;
-  if (!data || data.length === 0) return NOT_WRITTEN;
+  const { error: clearError } = await supabase
+    .from("gym_hour_blocks")
+    .delete()
+    .eq("gym_id", parsed.data.gymId);
+  if (clearError) return FAILED;
+
+  if (parsed.data.blocks.length > 0) {
+    const { error } = await supabase.from("gym_hour_blocks").insert(
+      parsed.data.blocks.map((b) => ({
+        gym_id: parsed.data.gymId,
+        day_of_week: b.dayOfWeek,
+        start_time: b.startTime,
+        end_time: b.endTime,
+      })),
+    );
+    if (error) return FAILED;
+  }
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin");
+  revalidatePath("/app");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** The weekly crowd timetable, replaced wholesale for the same reasons. */
+export async function replaceCrowdSchedule(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      gymId: z.string().uuid(),
+      slots: z
+        .array(scheduleRowSchema.extend({ level: z.enum(CROWD_LEVELS) }))
+        .max(120),
+    })
+    .safeParse(input);
+
+  if (!parsed.success) return FAILED;
+  if (parsed.data.slots.some((s) => !ordered(s))) {
+    return { ok: false, message: strings.admin.settings.blockOutOfOrder };
+  }
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+
+  const { error: clearError } = await supabase
+    .from("crowd_schedule")
+    .delete()
+    .eq("gym_id", parsed.data.gymId);
+  if (clearError) return FAILED;
+
+  if (parsed.data.slots.length > 0) {
+    const { error } = await supabase.from("crowd_schedule").insert(
+      parsed.data.slots.map((s) => ({
+        gym_id: parsed.data.gymId,
+        day_of_week: s.dayOfWeek,
+        start_time: s.startTime,
+        end_time: s.endTime,
+        level: s.level,
+      })),
+    );
+    if (error) return FAILED;
+  }
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
@@ -349,11 +419,15 @@ export async function setOpenOverride(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function setCrowdLevel(input: unknown): Promise<ActionResult> {
+/**
+ * The manual crowd level. Null hands control back to the weekly timetable,
+ * the same shape as clearing the open/closed override.
+ */
+export async function setCrowdOverride(input: unknown): Promise<ActionResult> {
   const parsed = z
     .object({
       gymId: z.string().uuid(),
-      level: z.enum(["not_crowded", "moderate", "crowded", "very_crowded"]),
+      level: z.enum(CROWD_LEVELS).nullable(),
     })
     .safeParse(input);
   if (!parsed.success) return FAILED;
@@ -362,7 +436,10 @@ export async function setCrowdLevel(input: unknown): Promise<ActionResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("gyms")
-    .update({ crowd_level: parsed.data.level, crowd_updated_at: new Date().toISOString() })
+    .update({
+      crowd_override: parsed.data.level,
+      crowd_updated_at: new Date().toISOString(),
+    })
     .eq("id", parsed.data.gymId)
     .select("id");
 

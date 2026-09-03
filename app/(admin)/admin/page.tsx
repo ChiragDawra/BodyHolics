@@ -11,7 +11,8 @@ import {
   getRevenueSummary,
   getStaffGym,
 } from "@/lib/queries/admin";
-import { parseWeeklyHours, resolveOpenState } from "@/lib/gym";
+import { resolveCrowdLevel, resolveOpenState } from "@/lib/gym";
+import { getGymSchedule } from "@/lib/queries/gym";
 import { formatFullDate } from "@/lib/format";
 import { strings } from "@/lib/strings";
 
@@ -29,15 +30,14 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  const [stats, revenue] = await Promise.all([
+  const [stats, revenue, schedule] = await Promise.all([
     getDashboardStats(gym.id),
     getRevenueSummary(gym.id),
+    getGymSchedule(gym.id),
   ]);
 
-  const openState = resolveOpenState(
-    parseWeeklyHours(gym.weekly_hours),
-    gym.is_open_override,
-  );
+  const openState = resolveOpenState(schedule.hourBlocks, gym.is_open_override);
+  const crowd = resolveCrowdLevel(schedule.crowdSlots, gym.crowd_override);
 
   const thisMonthLabel = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(
     new Date(),
@@ -149,11 +149,7 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-surface-raised p-5">
-          <GymStatusControls
-            gymId={gym.id}
-            openState={openState}
-            crowdLevel={gym.crowd_level}
-          />
+          <GymStatusControls gymId={gym.id} openState={openState} crowd={crowd} />
           <div className="flex items-baseline gap-2.5 pt-4">
             <span className="font-display text-3xl leading-none font-bold tracking-tighter text-ink">
               {stats.inGymNow}

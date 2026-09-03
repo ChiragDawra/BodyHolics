@@ -23,7 +23,7 @@ export function HeroStatus({
       : null
     : state.opensAt
       ? strings.member.opensAt(formatTime(state.opensAt))
-      : state.today === null
+      : state.todayBlocks.length === 0
         ? strings.member.closedToday
         : null;
 
