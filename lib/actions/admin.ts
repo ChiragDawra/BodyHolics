@@ -5,6 +5,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { CROWD_LEVELS } from "@/lib/gym";
 import { DISCOUNT_TERMS, DISCOUNT_TERM_MONTHS } from "@/lib/discounts";
+import { broadcastWhatsAppAlert, sendWhatsAppMessage } from "@/lib/whatsapp";
+import { formatFullDate } from "@/lib/format";
 import { isStaff } from "@/lib/supabase/auth";
 import { strings } from "@/lib/strings";
 
@@ -482,11 +484,62 @@ export async function recordCashPayment(input: unknown): Promise<ActionResult> {
 
   if (error || !data || data.length === 0) return FAILED;
 
+  const receipt = data[0]!;
+
+  // The invoice is queued, not sent — see lib/whatsapp.ts. A failure to queue
+  // must not fail the payment: the money is already in the drawer.
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("name")
+    .eq("id", parsed.data.planId)
+    .maybeSingle();
+
+  await sendWhatsAppMessage(parsed.data.profileId, "invoice", {
+    amountPaise: receipt.amount_paise,
+    planName: plan?.name ?? "",
+    endsOn: formatFullDate(receipt.ends_on),
+  });
+
   revalidatePath("/admin/members");
   revalidatePath("/admin/revenue");
+  revalidatePath("/admin/alerts");
   revalidatePath("/admin");
   revalidatePath("/app");
   revalidatePath("/app/me");
+  return { ok: true };
+}
+
+/**
+ * Queue a fee reminder for a member with something outstanding.
+ *
+ * The amount is summed here rather than passed in, so the message cannot
+ * quote a figure the books disagree with.
+ */
+export async function sendFeeReminder(input: unknown): Promise<ActionResult> {
+  const parsed = z.object({ profileId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return FAILED;
+  if (!(await guard())) return DENIED;
+
+  const supabase = await createClient();
+  const { data: pending } = await supabase
+    .from("payments")
+    .select("amount_paise")
+    .eq("profile_id", parsed.data.profileId)
+    .eq("status", "pending");
+
+  const amountPaise = (pending ?? []).reduce((sum, p) => sum + p.amount_paise, 0);
+  if (amountPaise === 0) return FAILED;
+
+  const queued = await sendWhatsAppMessage(parsed.data.profileId, "fee_reminder", {
+    amountPaise,
+  });
+
+  if (!queued) {
+    return { ok: false, message: strings.whatsapp.reminderNoPhone };
+  }
+
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/alerts");
   return { ok: true };
 }
 
@@ -606,6 +659,13 @@ export async function publishAlert(input: unknown): Promise<ActionResult> {
   });
 
   if (error) return FAILED;
+
+  // Alongside the in-app alert, never instead of it. The in-app one is the
+  // delivery that actually works today.
+  await broadcastWhatsAppAlert(parsed.data.gymId, {
+    title: parsed.data.title,
+    body: parsed.data.body,
+  });
 
   revalidatePath("/admin/alerts");
   revalidatePath("/app");

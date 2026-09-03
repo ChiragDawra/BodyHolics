@@ -1147,3 +1147,99 @@ was clicked again. Every write in the panel now calls back into `loadDetail`.
   display.
 - **The badge**: "25% OFF · UNTIL 3 DECEMBER" with a Remove control.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Phase 14 — WhatsApp, with the sender stubbed
+
+### D101. Rows are written `queued` and nothing marks them `sent`
+
+There is no WhatsApp provider: the Business API needs a verified Meta Business
+Account and a dedicated number that do not exist yet. So nothing claims a
+message was delivered. Every row sits at `queued`, the admin panel says
+plainly that no provider is connected, and `sent_at` and `error` stay null
+until something real fills them in.
+
+A success toast over a message that went nowhere is worse than no feature —
+it would have the owner believing members had been told about the holiday
+hours.
+
+### D102. One seam: `deliver()` in `lib/whatsapp.ts`
+
+`sendWhatsAppMessage` and `broadcastWhatsAppAlert` both funnel into a single
+private `deliver()`. Connecting a provider means posting each message there
+and updating the row — every caller, button, and template is untouched. The
+broadcast deliberately does not take a shortcut around it, or connecting a
+provider would fix single sends and silently leave alerts stubbed.
+
+### D103. The phone number is snapshotted onto the message
+
+`whatsapp_messages.phone` is copied at queue time rather than joined from
+`profiles`. If a member changes their number next month, the honest record is
+still "we tried to reach the old one".
+
+### D104. Amounts are computed server-side, never passed to the message
+
+`sendFeeReminder` sums the member's pending payments itself. If the caller
+passed a figure, a stale screen could quote a number the books disagree with —
+in a message the member keeps.
+
+### D105. A member with no phone is not an error
+
+`sendWhatsAppMessage` returns false rather than throwing, and the broadcast
+counts skips separately. Walk-in records legitimately have no number, and
+"queued for 31, 1 has no phone number" is the honest report.
+
+Queueing an invoice also never fails a payment: the money is already in the
+drawer by then.
+
+### D106. Bug found while testing: member search matched everyone
+
+Searching for a name returned all 32 members. The filter ended with:
+
+```js
+(m.phone ?? "").includes(needle.replace(/\D/g, ""))
+```
+
+Stripping non-digits from "Vikram" leaves the empty string, and
+`"anything".includes("")` is `true` — so the phone clause matched every member
+for every text search, and the search box had never actually filtered
+anything. The digits are now computed once and only compared when there are
+some.
+
+### Verified
+
+- **Alert broadcast**: published "Closing early on Saturday" and the outbox
+  gained exactly 31 rows — one per member with a phone number, out of 32
+  members, 31 of whom have one. All `queued`. The in-app alert published
+  alongside it, as before.
+- **Fee reminder**: appears only for a member with dues. Queued for a member
+  owing ₹10,000 with the body "BodyHolics: your membership fee of ₹10,000 is
+  still outstanding. You can pay at the desk any time we are open." — the
+  amount summed from the payments table, not from the screen.
+- **Invoice**: taking cash queued "BodyHolics: received ₹900 for your Monthly
+  membership. It runs until 3 November 2026. Thanks." — the *discounted* ₹900,
+  confirming the Phase 13 price reaches the receipt too.
+- **Renew-early, incidentally**: that second payment produced a membership
+  starting 2026-10-04, the day after the first one ends, rather than today.
+  D92 confirmed against real rows.
+- **The panel**: the outbox lists member name, body, type, relative time, and
+  a "Queued" badge, under a note explaining that nothing has been sent.
+- **Search fix**: typing "Vikram" now narrows 32 rows to 1.
+- `tsc --noEmit`, `eslint`, `next build` all clean.
+
+### Test data left behind
+
+The account used for testing (`dawrachirag0815@gmail.com`) has a real
+membership, payment, discount, and check-in from these verifications. The
+duplicate membership created to test the invoice trigger was removed. Also
+still present, and worth clearing before this is real:
+
+```sql
+-- The staff row added for testing (D63)
+delete from public.staff where id = '5420f88c-7b3d-4f2e-9285-2853b012181d';
+-- The queued WhatsApp messages from these tests
+delete from public.whatsapp_messages;
+-- The test alert
+delete from public.alerts where title = 'Closing early on Saturday';
+```

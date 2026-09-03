@@ -491,6 +491,42 @@ export const strings = {
     failedBody: "Tell the desk and they will record it for you.",
   },
 
+  /* -------------------------------------------------------------- whatsapp */
+
+  whatsapp: {
+    feeReminder: (gym: string, amount: string) =>
+      `${gym}: your membership fee of ${amount} is still outstanding. You can pay at the desk any time we are open.`,
+    invoice: (gym: string, amount: string, plan: string, endsOn: string) =>
+      `${gym}: received ${amount} for your ${plan} membership. It runs until ${endsOn}. Thanks.`,
+    alert: (gym: string, title: string, body: string) =>
+      body.trim().length > 0 ? `${gym}: ${title}\n\n${body}` : `${gym}: ${title}`,
+
+    logHeading: "WhatsApp outbox",
+    logNote:
+      "No WhatsApp provider is connected yet, so nothing here has actually been sent. These are the messages that would go out.",
+    logEmpty: "Nothing queued yet",
+    logEmptyBody:
+      "Fee reminders, invoices, and published alerts appear here as they are queued.",
+    status: {
+      queued: "Queued",
+      sent: "Sent",
+      failed: "Failed",
+    },
+    type: {
+      fee_reminder: "Fee reminder",
+      invoice: "Invoice",
+      alert: "Alert",
+    },
+    sendReminder: "Send a fee reminder",
+    sendingReminder: "Queueing",
+    reminderQueued: "Reminder queued. It will send once WhatsApp is connected.",
+    reminderNoPhone: "That member has no phone number on file.",
+    alertQueued: (queued: number, skipped: number) =>
+      skipped === 0
+        ? `Queued for ${queued} members`
+        : `Queued for ${queued} members · ${skipped} have no phone number`,
+  },
+
   /* --------------------------------------------------------------- install */
 
   install: {

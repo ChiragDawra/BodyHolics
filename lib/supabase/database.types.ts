@@ -622,6 +622,63 @@ export type Database = {
           },
         ]
       }
+      whatsapp_messages: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          error: string | null
+          gym_id: string
+          id: string
+          member_id: string
+          phone: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["whatsapp_status"]
+          type: Database["public"]["Enums"]["whatsapp_message_type"]
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          gym_id: string
+          id?: string
+          member_id: string
+          phone: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["whatsapp_status"]
+          type: Database["public"]["Enums"]["whatsapp_message_type"]
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          gym_id?: string
+          id?: string
+          member_id?: string
+          phone?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["whatsapp_status"]
+          type?: Database["public"]["Enums"]["whatsapp_message_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -719,6 +776,8 @@ export type Database = {
       payment_method: "cash" | "upi" | "card" | "other"
       payment_status: "collected" | "pending" | "refunded"
       staff_role: "owner" | "staff"
+      whatsapp_message_type: "fee_reminder" | "invoice" | "alert"
+      whatsapp_status: "queued" | "sent" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -856,6 +915,8 @@ export const Constants = {
       payment_method: ["cash", "upi", "card", "other"],
       payment_status: ["collected", "pending", "refunded"],
       staff_role: ["owner", "staff"],
+      whatsapp_message_type: ["fee_reminder", "invoice", "alert"],
+      whatsapp_status: ["queued", "sent", "failed"],
     },
   },
 } as const

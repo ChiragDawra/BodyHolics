@@ -449,3 +449,25 @@ export async function getDashboardStats(gymId: string): Promise<DashboardStats> 
     registrationsThisWeek: week.count ?? 0,
   };
 }
+
+/** The WhatsApp outbox, newest first, for the panel on the Alerts tab. */
+export async function getWhatsAppMessages(gymId: string, limit = 40) {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("whatsapp_messages")
+    .select("id, type, status, phone, body, created_at, profiles(full_name)")
+    .eq("gym_id", gymId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return (data ?? []).map((m) => ({
+    id: m.id,
+    type: m.type,
+    status: m.status,
+    phone: m.phone,
+    body: m.body,
+    created_at: m.created_at,
+    full_name: m.profiles?.full_name ?? null,
+  }));
+}

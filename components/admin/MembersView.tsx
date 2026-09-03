@@ -12,6 +12,7 @@ import {
   addMemberManually,
   recordCashPayment,
   removeMemberDiscount,
+  sendFeeReminder,
 } from "@/lib/actions/admin";
 import {
   DISCOUNT_TERMS,
@@ -89,6 +90,13 @@ export function MembersView({
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
+    /*
+     * Digits only, and only when there are some. Stripping non-digits from a
+     * text search leaves the empty string, and `"anything".includes("")` is
+     * true — so searching for a name used to match every member in the gym
+     * through the phone-number clause.
+     */
+    const digits = needle.replace(/\D/g, "");
 
     return members.filter((m) => {
       if (filter === "active" && !isActive(m)) return false;
@@ -99,7 +107,7 @@ export function MembersView({
       return (
         (m.full_name ?? "").toLowerCase().includes(needle) ||
         (m.email ?? "").toLowerCase().includes(needle) ||
-        (m.phone ?? "").includes(needle.replace(/\D/g, ""))
+        (digits !== "" && (m.phone ?? "").includes(digits))
       );
     });
   }, [members, query, filter]);
@@ -392,6 +400,8 @@ function DetailBody({
         </div>
       </div>
 
+      {member.duesPaise > 0 ? <FeeReminder member={member} /> : null}
+
       <p className="mb-2.5 mt-5 font-body text-label font-semibold tracking-label uppercase text-ink-dim">
         {strings.admin.members.membershipHistory}
       </p>
@@ -445,6 +455,56 @@ function DetailBody({
         </>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Nudge a member who owes something.
+ *
+ * Only rendered when there is actually an outstanding amount — a reminder
+ * button on a paid-up member is a way to annoy a customer by accident. The
+ * message says "queued", not "sent", because that is what happened.
+ */
+function FeeReminder({ member }: { member: MemberListRow }) {
+  const [state, setState] = useState<"idle" | "done">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const send = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await sendFeeReminder({ profileId: member.id });
+      if (result.ok) setState("done");
+      else setError(result.message);
+    });
+  };
+
+  return (
+    <div className="mt-3">
+      <Button
+        variant="secondary"
+        size="sm"
+        fullWidth
+        disabled={pending || state === "done"}
+        onClick={send}
+      >
+        {pending
+          ? strings.whatsapp.sendingReminder
+          : strings.whatsapp.sendReminder}
+      </Button>
+
+      {state === "done" ? (
+        <p role="status" className="mt-2 text-xs leading-relaxed text-ink-dim">
+          {strings.whatsapp.reminderQueued}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
