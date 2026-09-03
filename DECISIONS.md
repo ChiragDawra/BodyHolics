@@ -1329,3 +1329,44 @@ at `bottom-6` from `sm` up, where there is no bar to clear.
 - **FAB**: exactly one add-member control in the DOM (`fixed`,
   `border-radius: 9999px`), bottom-right, and no header button.
 - `tsc --noEmit`, `eslint`, `next build` all clean.
+
+---
+
+## Final verification
+
+Run against the live database and a running dev server, in phase order.
+
+| Phase | What was checked | Result |
+|---|---|---|
+| 8 | Toggled "Force closed" in `/admin`, watched `/app` in a second tab | **Pass** — flipped OPEN to CLOSED with the accent edge going green to red, no refresh, no navigation. `is_open_override` confirmed over REST, then restored to null. |
+| 8 | Staff can write `gyms`, members cannot | **Pass** — JWT impersonation in SQL: staff UPDATE matched 1 row, member 0. Control with an inverted expectation raised, proving the harness is live. |
+| 9 | `resolveOpenState` / `resolveCrowdLevel` against real rows at 12 times of day plus 5 override cases | **Pass** — all 17, including 13:00 closed with "opens 16:00", 15:59 closed, 16:00 open, and half-open boundaries at 21:59 / 22:00. |
+| 9 | Schedule editors write | **Pass** — 14 hour blocks, 36 crowd slots; a level change round-tripped through the UI and back out of REST, other rows intact. |
+| 10 | `/checkin` signed out | **Pass** — 307 to `/join?next=%2Fcheckin`. |
+| 10 | `/checkin` signed in, then again immediately | **Pass** — "You're in · Checked in at 5:12 pm", self-redirected to `/app`; second load said "Already checked in"; database holds exactly one row, `method = 'qr'`. |
+| 10 | Check-in feeds the rest of the app | **Pass** — live count 0 to 1, streak 0 to 1, Activity empty state to "1 visit since 3 September". |
+| 11 | Every admin aggregate against SQL | **Pass** — active members 18, new this month 11, collected ₹0, pending ₹11,200 across 2, 12 registrations this week, revenue months summing to ₹2,48,400. |
+| 11 | Gym controls scoped to Dashboard and Settings | **Pass** — `GymStatusControls` referenced in exactly those two files. |
+| 12 | Cash payment | **Pass** — one call wrote a membership 3 Sept–3 Oct and a `cash`/`collected` payment with `verified_at` and `verified_by` set. |
+| 12 | Member sees plans instead of a dead end | **Pass** — the three active plans with prices; the deactivated Annual absent. |
+| 12 | Renewing early extends | **Pass** — a second payment produced a membership starting 4 Oct, the day after the first ends. |
+| 13 | Discount reaches display *and* charge | **Pass** — 25% off shows as ₹900 beside a struck-through ₹1,200 on the member's plan list and in the admin dropdown, and the payment row written by "Mark paid in cash" recorded ₹900. |
+| 14 | Alert broadcast | **Pass** — 31 rows queued, one per member with a phone, out of 32 members of whom 31 have one. |
+| 14 | Fee reminder and invoice | **Pass** — reminder quoted ₹10,000 summed from the payments table; invoice quoted the discounted ₹900 and the correct end date. All `queued`, none claiming to be sent. |
+| 15 | Admin fills the width | **Pass** — the members table runs the full page width and long emails render in full where they were truncated. |
+| 15 | Landing page | **Pass** — two columns at desktop, both entry points, live status, seven-day split schedule, real plan prices. |
+| 16 | Capsule nav | **Pass** — inset, fully rounded, frosted; only the active tab carries colour, no fill on any. |
+| 17 | One add-member control | **Pass** — exactly one in the DOM, `position: fixed`, capsule, bottom-right; the header button is gone. |
+| — | `tsc --noEmit`, `eslint`, `next build` | **Pass** — all clean. |
+
+### Left unverified
+
+- **The stubbed WhatsApp sender.** By design: no provider is connected, so no
+  message has been delivered and none is claimed to be. What is verified is
+  that rows are queued with the right bodies and stay `queued`.
+- **A real phone.** Everything was checked in a desktop browser. The safe-area
+  insets on the capsule nav and the FAB are written against
+  `env(safe-area-inset-bottom)` but have not been seen on a device with a home
+  indicator.
+- **Google sign-in end to end.** The session used throughout already existed;
+  no new account was created through the flow.
