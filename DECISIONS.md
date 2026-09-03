@@ -1243,3 +1243,89 @@ delete from public.whatsapp_messages;
 -- The test alert
 delete from public.alerts where title = 'Closing early on Saturday';
 ```
+
+---
+
+## Phase 15 — Responsive admin, and a real landing page
+
+### D107. The admin content cap is gone entirely, not raised
+
+`max-w-6xl` on the admin `<main>` was the constraint. It left a third of a
+wide screen empty while the member table truncated email addresses inside its
+own columns — the worst of both, a page that is neither dense nor spacious.
+
+There is now no max-width. Padding steps up instead (`px-5` → `sm:px-8` →
+`xl:px-10` → `2xl:px-14`), so the content breathes on a large display without
+being flung to the far edges. The dashboard is a laptop tool and its tables
+have real columns to spend width on.
+
+The phone layout is everything below `sm` (640px), which is exactly where the
+sidebar gives way to the tab bar, so there is one breakpoint to reason about
+rather than two.
+
+### D108. The landing page got a second column and a second door
+
+It was a phone-shaped page even on a laptop. The rest of the public flow is
+phone-shaped for a good reason — it is scanned off a QR code on a wall — but
+this is also what someone opens after being told the gym's name.
+
+One column below `lg`, two above it: who this is and how to get in on the
+left, live status and the details on the right. The left column is sticky, so
+the way in stays on screen while the hours and prices scroll.
+
+It now answers, in order, what someone outside actually wants to know: is it
+open, how busy is it, what does it cost. Prices are read from `plans`, so
+there is nothing to keep in sync.
+
+And it carries the staff sign-in link, which existed as a route with nothing
+pointing at it — staff had to know to type `/admin`.
+
+---
+
+## Phase 16 — The nav is a capsule
+
+### D109. Only colour marks the current tab
+
+The bar became a floating capsule inset 10% from each edge, fully rounded,
+with a frosted translucent surface so the content stays visible behind it. It
+rests on the app rather than dividing it.
+
+The active tab is coloured — icon and label — with no pill, no fill, and no
+underline. The old bar had a coloured rule above the active item; on a capsule
+this small a second shape inside the first is noise, and with three tabs
+colour alone is unambiguous. `aria-current` carries the same fact for anyone
+not seeing the colour, and the active icon is also drawn slightly heavier.
+
+Same component for the member app and the admin phone view, so they cannot
+drift apart.
+
+---
+
+## Phase 17 — One way to add a member
+
+### D110. The header button went; the floating one stayed
+
+There were two entry points: a button in the page header that scrolls out of
+view, and a floating one. Two ways to do one thing is a decision the reader
+makes every time, and the header copy was the one that could not be reached
+while looking at the list you wanted to add to.
+
+The survivor is a proper FAB — fixed bottom-right, capsule, at every screen
+size rather than phone-only, so the action is in the same place whatever you
+are on. It clears the phone tab bar (`6rem` plus the safe-area inset) and sits
+at `bottom-6` from `sm` up, where there is no bar to clear.
+
+### Verified
+
+- **Admin fills the width**: the members table now runs the full width of the
+  page and `anirudh0173.becse24@chitkara.edu.in` renders in full where it was
+  truncated before.
+- **Landing**: two-column at desktop with the gym name, tagline, "Open my app"
+  and "Staff sign-in" on the left; live OPEN/crowd, all seven days of the
+  split schedule with today emphasised, and the three real plans with prices
+  on the right.
+- **Nav**: capsule, inset, frosted; Home in lavender with grey Activity and
+  Me, no background fill on any of them.
+- **FAB**: exactly one add-member control in the DOM (`fixed`,
+  `border-radius: 9999px`), bottom-right, and no header button.
+- `tsc --noEmit`, `eslint`, `next build` all clean.

@@ -13,16 +13,6 @@ export type Tab = {
 };
 
 /**
- * Floating frosted tab bar for the phone apps.
- *
- * It sits inset from the edges rather than spanning the full width, so the
- * content behind it stays visible through the blur — the app reads as one
- * surface with a control resting on it, not two stacked bars.
- *
- * `pb-[env(safe-area-inset-bottom)]` on the wrapper is what keeps it above the
- * iOS home indicator.
- */
-/**
  * Which tab owns the current URL.
  *
  * Prefix matching alone lights up every ancestor: on /app/me the Home tab
@@ -41,6 +31,22 @@ function activeHref(tabs: Tab[], pathname: string): string | null {
   return best;
 }
 
+/**
+ * A floating capsule, inset from both edges.
+ *
+ * Not a bar. A full-width bar cuts the screen in two and claims to be part of
+ * the app's structure; this rests on top of the content, which stays visible
+ * through the blur, so the app reads as one surface with a control on it.
+ *
+ * Only the current tab carries colour. No pill, no fill, no underline behind
+ * the active item — on a capsule this small a second shape inside the first
+ * is noise, and colour alone is unambiguous when there are three of them.
+ * (Colour is not the *only* signal: `aria-current` carries it for anyone not
+ * seeing the colour.)
+ *
+ * `pb-[env(safe-area-inset-bottom)]` on the wrapper is what keeps it clear of
+ * the iPhone home indicator.
+ */
 export function TabBar({ tabs }: { tabs: Tab[] }) {
   const pathname = usePathname();
   const current = activeHref(tabs, pathname);
@@ -50,9 +56,10 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
       <nav
         aria-label={strings.common.mainNav}
         className={cn(
-          "pointer-events-auto mx-auto mb-4 flex h-16 max-w-md overflow-hidden",
-          "mx-3.5 rounded-lg border border-white/[0.07]",
-          "bg-surface-overlay/80 backdrop-blur-xl",
+          "pointer-events-auto mx-[10%] mb-4 flex h-16 max-w-sm items-stretch sm:mx-auto",
+          "rounded-full border border-white/[0.08]",
+          "bg-surface-overlay/70 backdrop-blur-xl",
+          "shadow-[0_8px_30px_rgba(0,0,0,0.45)]",
         )}
       >
         {tabs.map((tab) => {
@@ -65,19 +72,12 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
               href={tab.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex flex-1 flex-col items-center justify-center gap-1.5",
-                "font-display text-label font-semibold transition-colors",
+                "flex flex-1 flex-col items-center justify-center gap-1",
+                "rounded-full font-display text-label font-semibold transition-colors",
                 active ? "text-brand" : "text-ink-dim",
               )}
             >
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute top-0 left-1/2 h-0.5 w-6.5 -translate-x-1/2 rounded-full transition-colors",
-                  active ? "bg-brand" : "bg-transparent",
-                )}
-              />
-              <Icon className="h-5.5 w-5.5" strokeWidth={1.8} />
+              <Icon className="h-5.5 w-5.5" strokeWidth={active ? 2.1 : 1.8} />
               {tab.label}
             </Link>
           );

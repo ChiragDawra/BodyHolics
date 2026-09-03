@@ -144,10 +144,6 @@ export function MembersView({
             {strings.admin.members.countLine(members.length, activeCount)}
           </p>
         </div>
-        <Button onClick={() => setAdding(true)} className="hidden sm:inline-flex">
-          <PlusIcon className="h-4 w-4" strokeWidth={2.2} />
-          {strings.admin.members.addManually}
-        </Button>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -303,13 +299,29 @@ export function MembersView({
         </Sheet>
       </div>
 
-      {/* Floating add button on the phone, where the header button is hidden. */}
+      {/*
+        One way to add a member, at every size.
+
+        There were two: a button in the header that scrolls out of view, and
+        this one. Two entry points for one action is a decision the reader has
+        to make every time, and the header copy was the one that could not be
+        reached while looking at the list you wanted to add to.
+
+        Fixed bottom-right, clear of the phone tab bar (which is 4rem tall
+        plus its own inset) and of the safe area.
+      */}
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="fixed bottom-28 right-5 z-40 flex h-12 items-center gap-2 rounded-md bg-brand px-4.5 font-display text-sm font-semibold text-on-brand shadow-lg transition-colors hover:bg-brand-hover sm:hidden"
+        aria-label={strings.admin.members.addManually}
+        className={cn(
+          "fixed right-5 z-40 flex h-13 items-center gap-2 rounded-full",
+          "bottom-[calc(6rem+env(safe-area-inset-bottom))] sm:bottom-6",
+          "bg-brand px-5 font-display text-sm font-semibold text-on-brand",
+          "shadow-[0_8px_30px_rgba(0,0,0,0.45)] transition-colors hover:bg-brand-hover",
+        )}
       >
-        <PlusIcon className="h-4 w-4" strokeWidth={2.2} />
+        <PlusIcon className="h-4.5 w-4.5" strokeWidth={2.2} />
         {strings.admin.members.addShort}
       </button>
 
