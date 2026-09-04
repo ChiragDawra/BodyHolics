@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { HeroStatus } from "@/components/member/HeroStatus";
 import { CrowdMeter } from "@/components/member/CrowdMeter";
+import { cn } from "@/lib/cn";
+import { strings } from "@/lib/strings";
 import {
   resolveCrowdLevel,
   resolveOpenState,
@@ -186,4 +188,37 @@ export function LiveHeroStatus() {
 
 export function LiveCrowdMeter() {
   return <CrowdMeter level={useGym().crowd.level} />;
+}
+
+/**
+ * Open or closed as a single chip, for the launch screen's header.
+ *
+ * The reference design put a static "24/7 access" badge in this slot. This
+ * gym runs a split schedule and is shut for four and a half hours in the
+ * middle of every day, so the badge says what is actually true right now and
+ * changes with everything else when the desk flips the override.
+ */
+export function LiveOpenPill() {
+  const { openState } = useGym();
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1",
+        "font-body text-label font-bold tracking-label uppercase",
+        openState.isOpen
+          ? "border-success/25 bg-success/10 text-success"
+          : "border-danger/25 bg-danger/10 text-danger",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          openState.isOpen ? "bg-success" : "bg-danger",
+        )}
+      />
+      {openState.isOpen ? strings.member.openLoud : strings.member.closedLoud}
+    </span>
+  );
 }

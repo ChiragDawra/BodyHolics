@@ -1370,3 +1370,111 @@ Run against the live database and a running dev server, in phase order.
   indicator.
 - **Google sign-in end to end.** The session used throughout already existed;
   no new account was created through the flow.
+
+---
+
+## Brand — the BodyHolic mark, and the launch screen
+
+### D111. The artwork is cleaned by a script, not by hand
+
+`scripts/build-mark.py` turns the generated PNG into the one master everything
+else is built from. Three things had to happen to it and all three are worth
+recording, because "I opened it in an editor once" is not reproducible:
+
+- **The generator watermark is erased.** It sat in the bottom-right corner and
+  would otherwise have survived into every icon size. Its box was measured off
+  the source rather than eyeballed.
+- **Alpha comes from luminance, not a colour key.** The black in the source is
+  not only *around* the figure — the "BODY HOLIC" lettering and the muscle
+  lines are black knocked out of the white torso. Keying the outside only
+  would have left an opaque slab behind the letters. Taking alpha from
+  luminance turns every black pixel transparent at once, so the lettering is a
+  true cut-out over whatever it is placed on, and anti-aliased edges keep
+  their falloff instead of going jagged.
+- **Every pixel is forced to white**, so the mark can sit on any ground
+  without dragging a grey fringe along.
+
+The raw file moved to `design/source/` — a 4 MB PNG in the repo root is not a
+project file, it is a download.
+
+### D112. Small icon sizes get a bigger mark
+
+`generate-icons.mjs` now builds from that master. The figure spans 82% of the
+canvas at 512 and 94% at 48 and below: at 16px the whole mark is about
+thirteen pixels across, and the margin that reads as deliberate padding on a
+home screen is detail it cannot afford. Checked by rendering 16 and 32 at
+several fractions and looking at them side by side.
+
+Even so, **16px is the weak size** — the raised arms and the knocked-out
+lettering are simply more detail than sixteen pixels hold, and it reduces to a
+pale V. That is a property of the artwork, not of the pipeline. A separate
+simplified glyph for the favicon is the fix if it ever matters.
+
+The `.ico` now carries 16, 32 and 48 instead of only 32, so Windows and
+browsers stop upscaling a blurry 32 into a 48px slot.
+
+`app/icon.svg` was deleted. Next.js emits a `<link>` for *every* icon file in
+`app/`, so leaving the old weight-plate SVG behind would have shipped two
+competing favicons and let the browser pick the wrong one.
+
+### D113. The launch screen took the reference's look, not its claims
+
+The slogan wall, the tilt, the glowing mark and the two stacked buttons all
+came across. Three things did not, because they were not true of this gym:
+
+- **"24/7 ACCESS"** — it is open 5:30–11:30 and 16:00–22:00, and shut for four
+  and a half hours in the middle of every day. That slot now holds
+  `LiveOpenPill`, which says OPEN or CLOSED for real and changes with
+  everything else the moment the desk flips the override.
+- **"Start Trial"** — there is no trial. The plans are monthly and up, paid at
+  the desk.
+- **"No Commitment"** — the same.
+
+A launch screen is the first thing a prospective member reads. Shipping three
+false claims on it to match a mock-up would be the most expensive kind of
+copying.
+
+### D114. The wall is generated, and does not blur
+
+The reference hand-writes about 280 `<span>`s and gives each a
+`backdrop-filter: blur(2px)`. Both were changed:
+
+- It is built from one list in `strings.ts`, rotated per row. The wall has to
+  cover a rectangle larger than the viewport *because* it is rotated 25
+  degrees, so how much text is needed is a function of the screen, not
+  something to maintain by hand. Row offsets are fixed rather than random so
+  the server and client render the same markup.
+- No per-badge backdrop filter. At that count it is hundreds of separate
+  backdrop passes, which is exactly what makes a scroll janky on the
+  mid-range Android this is mostly opened on. A flat translucent fill is
+  indistinguishable here.
+
+The wall is `aria-hidden`: a screen reader announcing fifty-eight slogans
+before reaching "Join as a new member" is worse than no background at all.
+
+### D115. No `mix-blend-mode` was needed
+
+The reference uses `mix-blend-mode: screen` to hide the black box around the
+logo. Because the master carries real alpha, the image is simply placed. That
+also means it works over the cards and the wall rather than only over black.
+
+### Verified
+
+- **Icons**: all six artefacts regenerate from the master; `/favicon.ico`,
+  `/icon.png`, `/apple-icon.png`, `/icons/icon-192.png` and
+  `/icons/maskable-512.png` all serve 200. The rendered page emits exactly
+  three icon `<link>`s — ico 48, png 512, apple-touch 180 — and no stale SVG.
+- **Mark**: composited over the app's ground and inspected; watermark gone,
+  crop tight, lettering reads as a true knockout.
+- **Launch screen** at desktop: wall, glowing mark, both buttons, and a
+  CLOSED pill that agrees with the CLOSED hero beside it (checked at 00:30
+  IST, outside both blocks).
+- `tsc --noEmit`, `eslint`, `next build` all clean.
+
+### Not verified
+
+**The phone layout.** `resize_window` is capped at 1680px in this browser and
+popups are blocked, so the sub-`lg` stacking — full-viewport launch screen
+with the detail scrolling under it — was confirmed from the computed rules
+(`min-h-dvh` with `lg:min-h-0` resolving to `0px` at desktop) rather than by
+looking at it. Worth a glance on a real phone.

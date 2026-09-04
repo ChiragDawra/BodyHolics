@@ -155,6 +155,29 @@
   );
 }
 
+/**
+ * The tilted slogan wall behind the launch screen.
+ *
+ * Lives here rather than in arbitrary Tailwind values because it is one
+ * coherent piece of geometry — the rotation and the oversize are a pair, and
+ * splitting them across a dozen bracket classes hides that relationship. The
+ * box is 250% of the viewport in both directions because a 100vw square
+ * rotated 25 degrees no longer covers the screen it came from.
+ */
+.bh-quote-wall {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 250vw;
+  height: 250vh;
+  transform: translate(-50%, -50%) rotate(-25deg);
+  transform-origin: center center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.15rem;
+}
+
 /* Respect the system setting. Anything decorative stops moving. */
 @media (prefers-reduced-motion: reduce) {
   *,

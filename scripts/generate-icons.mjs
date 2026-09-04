@@ -1,67 +1,124 @@
 /**
- * Rasterises design/icon-master.svg into the six icon artefacts the app needs.
+ * Rasterises design/bodyholic-mark.png into every icon artefact the app needs.
  *
  * Run with: node scripts/generate-icons.mjs
+ * The master itself comes from scripts/build-mark.py — see the notes there.
  *
  * Outputs are committed, so this only needs re-running when the mark changes.
  * It leans on the `sharp` that ships with Next.js rather than adding a
  * dependency of its own.
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import sharp from "sharp";
 
-const master = await readFile("design/icon-master.svg");
+/** --color-surface. Must stay in sync with lib/theme.ts and globals.css. */
+const GROUND = "#0A0A0C";
 
-const render = (size, svg = master) =>
-  sharp(svg, { density: 512 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer();
+const master = await readFile("design/bodyholic-mark.png");
 
-// Android crops a maskable icon to whatever shape the launcher uses, so the
-// mark sits inside the central 80% and the ground bleeds to every edge.
-const maskableSvg = Buffer.from(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-     <rect width="512" height="512" fill="#141413"/>
-     <g transform="translate(256,256) scale(0.78) translate(-256,-256)">
-       <circle cx="256" cy="256" r="186" fill="#E1502A"/>
-       <rect x="171" y="171" width="170" height="170" rx="16" fill="#141413"/>
-     </g>
-   </svg>`,
-);
+/**
+ * The mark on the app's own ground, square.
+ *
+ * The artwork is a white silhouette on transparency and is half again as wide
+ * as it is tall, so it is fitted by width and centred vertically — `contain`
+ * against a square would letterbox it and leave it looking small.
+ *
+ * `fraction` is how much of the canvas width the figure spans. Small sizes get
+ * more of it: at 16px the figure is only about thirteen pixels across and the
+ * arms and the knocked-out lettering mush into a grey blob, so the margin that
+ * reads as deliberate padding at 512 is detail it cannot afford. Checked by
+ * rendering 16 and 32 at several fractions and looking at them.
+ */
+function defaultFraction(size) {
+  return size <= 48 ? 0.94 : 0.82;
+}
 
-/** Minimal .ico container wrapping a single 32x32 PNG. */
-function pngToIco(png) {
+async function icon(size, { fraction = defaultFraction(size), flatten = true } = {}) {
+  const markWidth = Math.round(size * fraction);
+
+  const mark = await sharp(master)
+    .resize({ width: markWidth })
+    .png()
+    .toBuffer();
+
+  const canvas = sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: flatten ? GROUND : { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  }).composite([{ input: mark, gravity: "centre" }]);
+
+  return canvas.png({ compressionLevel: 9 }).toBuffer();
+}
+
+/**
+ * An .ico holding several sizes.
+ *
+ * Windows and some browsers pick the size they want out of the container, so
+ * shipping only 32 leaves them upscaling a blurry one into a 48px slot. Each
+ * entry is a whole PNG, which every target since Vista understands.
+ */
+function pngsToIco(entries) {
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); // reserved
   header.writeUInt16LE(1, 2); // type: icon
-  header.writeUInt16LE(1, 4); // one image
+  header.writeUInt16LE(entries.length, 4);
 
-  const entry = Buffer.alloc(16);
-  entry[0] = 32; // width
-  entry[1] = 32; // height
-  entry[2] = 0; // palette
-  entry[3] = 0; // reserved
-  entry.writeUInt16LE(1, 4); // colour planes
-  entry.writeUInt16LE(32, 6); // bits per pixel
-  entry.writeUInt32LE(png.length, 8);
-  entry.writeUInt32LE(header.length + entry.length, 12);
+  let offset = header.length + entries.length * 16;
+  const dir = [];
 
-  return Buffer.concat([header, entry, png]);
+  for (const { size, png } of entries) {
+    const entry = Buffer.alloc(16);
+    entry[0] = size >= 256 ? 0 : size; // 0 means 256
+    entry[1] = size >= 256 ? 0 : size;
+    entry[2] = 0; // palette
+    entry[3] = 0; // reserved
+    entry.writeUInt16LE(1, 4); // colour planes
+    entry.writeUInt16LE(32, 6); // bits per pixel
+    entry.writeUInt32LE(png.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    offset += png.length;
+    dir.push(entry);
+  }
+
+  return Buffer.concat([header, ...dir, ...entries.map((e) => e.png)]);
 }
 
 await mkdir("public/icons", { recursive: true });
 
-// Modern browsers take the vector directly.
-await writeFile("app/icon.svg", master);
+/**
+ * The previous mark was an SVG. Next.js emits a <link> for every icon file it
+ * finds in app/, so leaving it behind would ship two competing favicons and
+ * let the browser choose the old one.
+ */
+await rm("app/icon.svg", { force: true });
 
-await writeFile("app/favicon.ico", pngToIco(await render(32)));
-
-// iOS renders transparency as black, so this one is flattened onto the ground.
 await writeFile(
-  "app/apple-icon.png",
-  await sharp(await render(180)).flatten({ background: "#141413" }).png().toBuffer(),
+  "app/favicon.ico",
+  pngsToIco(
+    await Promise.all(
+      [16, 32, 48].map(async (size) => ({ size, png: await icon(size) })),
+    ),
+  ),
 );
 
-await writeFile("public/icons/icon-192.png", await render(192));
-await writeFile("public/icons/icon-512.png", await render(512));
-await writeFile("public/icons/maskable-512.png", await render(512, maskableSvg));
+await writeFile("app/icon.png", await icon(512));
 
-console.log("icons written");
+// iOS renders transparency as black and applies its own rounding, so this one
+// is opaque and edge-to-edge.
+await writeFile("app/apple-icon.png", await icon(180));
+
+await writeFile("public/icons/icon-192.png", await icon(192));
+await writeFile("public/icons/icon-512.png", await icon(512));
+
+/**
+ * Android crops a maskable icon to whatever shape the launcher uses, and only
+ * the central 80% of the canvas is guaranteed to survive. A wide mark
+ * inscribed in that circle can span about 65% of the width before its corners
+ * leave the safe zone, so this one is set well inside that.
+ */
+await writeFile("public/icons/maskable-512.png", await icon(512, { fraction: 0.6 }));
+
+console.log("icons written from design/bodyholic-mark.png");
